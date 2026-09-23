@@ -1433,23 +1433,41 @@ svg{stroke:currentColor;fill:none;stroke-linecap:round;stroke-linejoin:round}
 
 
 /* ===== Admin analytics ===== */
-.analytics-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:18px}
-.analytics-stat{min-height:155px;padding:20px;border:1px solid var(--line);border-radius:18px;background:#fff;box-shadow:var(--shadow-xs);display:flex;flex-direction:column}
-.analytics-stat span{font-size:11px;font-weight:750;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.analytics-toolbar{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-top:18px;padding:14px;border:1px solid var(--line);border-radius:16px;background:#fff;box-shadow:var(--shadow-xs)}
+.analytics-range-main{display:grid;gap:6px;min-width:220px}
+.analytics-toolbar label{font-size:10px;font-weight:750;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.analytics-toolbar select,.analytics-toolbar input{min-height:42px;padding:9px 12px;border:1px solid var(--line);border-radius:11px;background:#fbfdfb;color:var(--ink);font:inherit;font-size:12px}
+.analytics-custom-dates{display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap}
+.analytics-custom-dates label{display:grid;gap:6px}
+.analytics-period{margin-left:auto;padding:10px 12px;border-radius:11px;background:#f4f9f5;color:var(--muted);font-size:11px}
+.analytics-period strong{color:var(--green-6)}
+.analytics-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:14px}
+.analytics-grid-core{grid-template-columns:repeat(5,minmax(0,1fr))}
+.analytics-stat{min-height:158px;padding:20px;border:1px solid var(--line);border-radius:18px;background:#fff;box-shadow:var(--shadow-xs);display:flex;flex-direction:column}
+.analytics-stat span{font-size:10.5px;font-weight:750;color:var(--muted);text-transform:uppercase;letter-spacing:.055em}
 .analytics-stat strong{font-size:38px;line-height:1;margin-top:18px;letter-spacing:-.04em;color:var(--ink)}
-.analytics-stat small{margin-top:auto;padding-top:14px;font-size:11px;line-height:1.45;color:var(--muted)}
+.analytics-stat small{margin-top:auto;padding-top:14px;font-size:10.5px;line-height:1.45;color:var(--muted)}
 .analytics-note{margin-top:14px;padding:13px 14px;border:1px solid var(--line);border-radius:13px;background:#f8fbf8;color:var(--muted);font-size:11px;line-height:1.5}
+@media(max-width:1250px){
+  .analytics-grid-core{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
 @media(max-width:860px){
-  .analytics-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:12px}
-  .analytics-stat{min-height:132px;padding:14px;border-radius:14px}
+  .analytics-toolbar{align-items:stretch;padding:11px;gap:9px}
+  .analytics-range-main{min-width:0;width:100%}
+  .analytics-toolbar select,.analytics-toolbar input{width:100%;min-height:44px;font-size:12px}
+  .analytics-custom-dates{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
+  .analytics-custom-dates .btn-compact{grid-column:1/-1;justify-content:center}
+  .analytics-period{margin-left:0;width:100%;font-size:10.5px}
+  .analytics-grid-core{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:10px}
+  .analytics-stat{min-height:138px;padding:14px;border-radius:14px}
   .analytics-stat span{font-size:9.5px}
-  .analytics-stat strong{font-size:30px;margin-top:13px}
+  .analytics-stat strong{font-size:31px;margin-top:13px}
   .analytics-stat small{font-size:10px;padding-top:10px}
   .analytics-note{font-size:10px}
 }
 @media(max-width:430px){
-  .analytics-grid{grid-template-columns:1fr}
-  .analytics-stat{min-height:118px}
+  .analytics-grid-core{grid-template-columns:1fr}
+  .analytics-stat{min-height:122px}
 }
 
 /* ===== Studio 7 credit / true app footer ===== */
@@ -1542,6 +1560,9 @@ const state = {
   historyLoading:false,
   analytics:null,
   analyticsLoading:false,
+  analyticsRange:'30d',
+  analyticsFrom:'',
+  analyticsTo:'',
   pushDiagnostic:'',
   pushDiagnosticType:'neutral',
   mobileMenuOpen:false
@@ -1983,30 +2004,72 @@ function historyItem(item){
 function analyticsPage(){
   const a=state.analytics;
   const value=(v)=>state.analyticsLoading?'…':(v??'—');
-  return `<section class="hero"><div class="eyebrow">Admin</div><h1>Najavi analitika</h1><p>Stvarni korisnički nalozi, instalacije i aktivnost — bez internih/admin naloga.</p></section>
-  <div class="analytics-grid">
-    <div class="analytics-stat"><span>Korisnički nalozi</span><strong>${value(a?.customerAccounts)}</strong><small>${a?('+'+a.accounts7d+' u poslednjih 7 dana · admini nisu uračunati'):'Registrovani korisnici bez internih naloga'}</small></div>
-    <div class="analytics-stat"><span>Interni / admin nalozi</span><strong>${value(a?.internalAccounts)}</strong><small>Ne ulaze ni u jednu korisničku metriku ni konverziju</small></div>
-    <div class="analytics-stat"><span>Ikada instalirali</span><strong>${value(a?.everInstalledUsers)}</strong><small>${a?(a.deviceInstallations+' uređaja ukupno · +'+a.installedUsers7d+' korisnika u 7 dana'):'Jedinstveni korisnici kod kojih je detektovana instalirana PWA'}</small></div>
-    <div class="analytics-stat"><span>Aktivne instalacije · 30 dana</span><strong>${value(a?.activeInstallUsers30d)}</strong><small>${a?(a.activeInstallDevices30d+' uređaja otvorilo instaliranu aplikaciju u 30 dana'):'Aktivne, a ne samo istorijske instalacije'}</small></div>
-    <div class="analytics-stat"><span>Push registrovan</span><strong>${value(a?.pushUsers)}</strong><small>${a?(a.pushDevices+' registrovanih uređaja'):'Server ima push pretplatu za korisnika'}</small></div>
-    <div class="analytics-stat"><span>Aktivni · 24 h</span><strong>${value(a?.activeUsers1d)}</strong><small>Jedinstveni korisnici koji su otvorili aplikaciju u poslednja 24 sata</small></div>
-    <div class="analytics-stat"><span>Aktivni · 7 dana</span><strong>${value(a?.activeUsers7d)}</strong><small>Jedinstveni korisnici koji su otvorili aplikaciju u poslednjih 7 dana</small></div>
-    <div class="analytics-stat"><span>Aktivni · 30 dana</span><strong>${value(a?.activeUsers30d)}</strong><small>Jedinstveni korisnici koji su otvorili aplikaciju u poslednjih 30 dana</small></div>
-    <div class="analytics-stat"><span>Nalog → instalacija</span><strong>${value(a?.accountToInstallConversion)}${a?'%':''}</strong><small>Konverzija korisničkih naloga u detektovane instalacije</small></div>
+  const custom=state.analyticsRange==='custom';
+  const rangeText=a?.range
+    ? (a.range.key==='all'?'Sve vreme':a.range.from===a.range.to?a.range.from:(a.range.from+' — '+a.range.to))
+    : '—';
+  return `<section class="hero analytics-hero"><div><div class="eyebrow">Admin</div><h1>Najavi analitika</h1><p>Landing, registracije, notifikacije i instalacije u izabranom periodu.</p></div></section>
+  <div class="analytics-toolbar">
+    <div class="analytics-range-main">
+      <label for="analyticsRangeSelect">Vremenski raspon</label>
+      <select id="analyticsRangeSelect">
+        <option value="today" ${state.analyticsRange==='today'?'selected':''}>Danas</option>
+        <option value="7d" ${state.analyticsRange==='7d'?'selected':''}>Poslednjih 7 dana</option>
+        <option value="30d" ${state.analyticsRange==='30d'?'selected':''}>Poslednjih 30 dana</option>
+        <option value="90d" ${state.analyticsRange==='90d'?'selected':''}>Poslednjih 90 dana</option>
+        <option value="all" ${state.analyticsRange==='all'?'selected':''}>Sve vreme</option>
+        <option value="custom" ${custom?'selected':''}>Izaberi datume</option>
+      </select>
+    </div>
+    ${custom?`<div class="analytics-custom-dates">
+      <label>Od<input type="date" id="analyticsFrom" value="${escapeAttr(state.analyticsFrom)}"></label>
+      <label>Do<input type="date" id="analyticsTo" value="${escapeAttr(state.analyticsTo)}"></label>
+      <button class="btn-compact primary" data-action="apply-analytics-range">Primeni</button>
+    </div>`:''}
+    <div class="analytics-period">Period: <strong>${rangeText}</strong></div>
   </div>
-  <div class="analytics-note"><strong>Kako se računa:</strong> admin nalozi su izbačeni iz korisničkih brojeva. „Ikada instalirali“ znači da je PWA instalacija detektovana bar jednom; „Aktivne instalacije“ su instalirane aplikacije otvorene u poslednjih 30 dana. Praćenje instalacija i aktivnosti uvedeno je 23.09.2026, a starije instalacije se dopunjuju kada se aplikacija ponovo otvori.</div>`;
+
+  <div class="analytics-grid analytics-grid-core">
+    <div class="analytics-stat"><span>Landing · unikatne posete</span><strong>${value(a?.landingUniqueVisitors)}</strong><small>Jedinstveni browseri koji su otvorili najavi.rs u periodu</small></div>
+    <div class="analytics-stat"><span>Landing · page views</span><strong>${value(a?.landingPageViews)}</strong><small>Ukupan broj otvaranja landing strane u periodu</small></div>
+    <div class="analytics-stat"><span>Aktivni registrovani nalozi</span><strong>${value(a?.activeRegisteredAccounts)}</strong><small>${a?(a.registrationsInRange+' novih registracija u periodu · '+a.totalRegisteredAccounts+' ukupno registrovanih'):'Registrovani korisnici koji su otvorili aplikaciju u periodu'}</small></div>
+    <div class="analytics-stat"><span>Uključili notifikacije</span><strong>${value(a?.notificationsEnabledInRange)}</strong><small>${a?(a.currentPushUsers+' korisnika trenutno ima aktivan push'):'Jedinstveni korisnici koji su uključili push u periodu'}</small></div>
+    <div class="analytics-stat"><span>Instalirali aplikaciju</span><strong>${value(a?.installsInRange)}</strong><small>${a?(a.everInstalledUsers+' korisnika ikada · '+a.deviceInstallations+' uređaja'):'Jedinstveni korisnici koji su instalirali PWA u periodu'}</small></div>
+  </div>
+  <div class="analytics-note"><strong>Napomena:</strong> admin/interni nalozi se ne računaju. Landing posete se anonimno mere od 23.09.2026. Instalacije i uključivanje notifikacija starijih korisnika dopunjavaju se kada ponovo otvore aplikaciju.</div>`;
+}
+function analyticsToday(){
+  const d=new Date();
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function analyticsDefaultCustomDates(){
+  const to=analyticsToday();
+  const d=new Date();
+  d.setDate(d.getDate()-29);
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
+  return {from:`${y}-${m}-${day}`,to};
 }
 async function loadAnalytics(){
   if(!state.user||!isAdminUser())return;
+  if(state.analyticsRange==='custom'&&(!state.analyticsFrom||!state.analyticsTo)){
+    const d=analyticsDefaultCustomDates();
+    state.analyticsFrom=d.from;state.analyticsTo=d.to;
+  }
   state.analyticsLoading=true;if(state.tab==='analytics')render();
   try{
-    const res=await fetch('/api/analytics',{headers:{Accept:'application/json'}});
-    if(!res.ok)throw new Error('HTTP '+res.status);
-    state.analytics=await res.json();
+    const params=new URLSearchParams({range:state.analyticsRange});
+    if(state.analyticsRange==='custom'){
+      params.set('from',state.analyticsFrom);
+      params.set('to',state.analyticsTo);
+    }
+    const res=await fetch('/api/analytics?'+params.toString(),{headers:{Accept:'application/json'}});
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok)throw new Error(data.error||('HTTP '+res.status));
+    state.analytics=data;
   }catch(e){
     state.analytics=null;
-    toast('Analitika trenutno nije dostupna.');
+    toast(e?.message||'Analitika trenutno nije dostupna.');
   }finally{
     state.analyticsLoading=false;if(state.tab==='analytics')render();
   }
@@ -2074,6 +2137,25 @@ function render(){
 }
 function bind(){
   document.querySelectorAll('[data-tab]').forEach(el=>el.onclick=()=>{state.tab=el.dataset.tab;state.profileOpen=false;state.mobileMenuOpen=false;render();if(state.tab==='history')loadHistory();if(state.tab==='analytics')loadAnalytics()});
+  const analyticsRangeSelect=document.getElementById('analyticsRangeSelect');
+  if(analyticsRangeSelect)analyticsRangeSelect.onchange=()=>{
+    state.analyticsRange=analyticsRangeSelect.value;
+    if(state.analyticsRange==='custom'&&(!state.analyticsFrom||!state.analyticsTo)){
+      const d=analyticsDefaultCustomDates();state.analyticsFrom=d.from;state.analyticsTo=d.to;
+    }
+    loadAnalytics();
+  };
+  const analyticsFrom=document.getElementById('analyticsFrom');
+  if(analyticsFrom)analyticsFrom.onchange=()=>{state.analyticsFrom=analyticsFrom.value};
+  const analyticsTo=document.getElementById('analyticsTo');
+  if(analyticsTo)analyticsTo.onchange=()=>{state.analyticsTo=analyticsTo.value};
+  const analyticsApply=document.querySelector('[data-action="apply-analytics-range"]');
+  if(analyticsApply)analyticsApply.onclick=()=>{
+    if(!state.analyticsFrom||!state.analyticsTo)return toast('Izaberi oba datuma.');
+    if(state.analyticsFrom>state.analyticsTo)return toast('Datum „Od“ mora biti pre datuma „Do“.');
+    loadAnalytics();
+  };
+
   document.querySelectorAll('[data-auth-mode]').forEach(el=>el.onclick=()=>{
     const next=el.dataset.authMode;
     if(next==='login'&&state.resetToken){
@@ -2263,12 +2345,13 @@ async function syncExistingPushSubscription(){
     const reg=await navigator.serviceWorker.ready;
     const sub=await reg.pushManager.getSubscription();
     if(!sub)return;
-    await fetch('/api/push-subscribe',{
+    const res=await fetch('/api/push-subscribe',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       credentials:'same-origin',
       body:JSON.stringify({subscription:sub.toJSON()})
     });
+    if(res.ok)trackAnalytics('push_enabled','sync');
   }catch{}
 }
 async function ensurePushSubscription(forceReset=false){
@@ -2313,6 +2396,7 @@ async function ensurePushSubscription(forceReset=false){
   if(!res.ok)throw new Error(data.error||'Server nije sačuvao push pretplatu.');
 
   state.pushEnabled=true;
+  trackAnalytics('push_enabled','enabled');
   return {reg,sub};
 }
 async function runLocalNotificationTest(reg){
