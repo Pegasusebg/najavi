@@ -194,5 +194,24 @@
     </div>
     <div class="wrap studio-credit">Napravljeno sa <span aria-hidden="true">❤️</span> u <a href="https://studio7.rs" target="_blank" rel="noopener">Studio 7</a></div>
   </footer>
+
+  <script>
+  (() => {
+    try {
+      let visitorId=localStorage.getItem('najavi_landing_visitor_id');
+      if(!visitorId){
+        visitorId=crypto.randomUUID();
+        localStorage.setItem('najavi_landing_visitor_id',visitorId);
+      }
+      const viewId=crypto.randomUUID();
+      fetch('/api/analytics',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        keepalive:true,
+        body:JSON.stringify({event:'landing_view',visitorId,viewId})
+      }).catch(()=>{});
+    } catch {}
+  })();
+  </script>
 </body>
 </html>
