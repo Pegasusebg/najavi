@@ -2022,28 +2022,31 @@ async function registerSW(){
 }
 async function checkPushStatus(){
   state.pushDiagnosticType='neutral';
-  if(!window.isSecureContext){state.pushEnabled=false;state.pushDiagnostic='Push zahteva HTTPS.';state.pushDiagnosticType='error';return}
-  if(!('Notification'in window)){state.pushEnabled=false;state.pushDiagnostic='Ovaj browser nema Notifications API.';state.pushDiagnosticType='error';return}
-  if(!('serviceWorker'in navigator)||!('PushManager'in window)){state.pushEnabled=false;state.pushDiagnostic='Ovaj browser ne podržava Web Push.';state.pushDiagnosticType='error';return}
+  state.pushChecked=false;
+  if(!window.isSecureContext){state.pushEnabled=false;state.pushDiagnostic='Push zahteva HTTPS.';state.pushDiagnosticType='error';state.pushChecked=true;return}
+  if(!('Notification'in window)){state.pushEnabled=false;state.pushDiagnostic='Ovaj browser nema Notifications API.';state.pushDiagnosticType='error';state.pushChecked=true;return}
+  if(!('serviceWorker'in navigator)||!('PushManager'in window)){state.pushEnabled=false;state.pushDiagnostic='Ovaj browser ne podržava Web Push.';state.pushDiagnosticType='error';state.pushChecked=true;return}
   try{
     const reg=await registerSW();
     if(!reg){state.pushEnabled=false;state.pushDiagnosticType='error';return}
     const sub=await reg.pushManager.getSubscription();
     state.pushEnabled=Boolean(sub);
     if(Notification.permission==='denied'){
-      state.pushDiagnostic='Notifikacije su blokirane za ovaj sajt. U Chrome podešavanjima dozvoli Notifications.';
+      state.pushDiagnostic='Notifikacije su blokirane za ovaj sajt. Dozvoli ih u podešavanjima browsera.';
       state.pushDiagnosticType='error';
     }else if(state.pushEnabled){
-      state.pushDiagnostic='Uređaj je registrovan za push.';
+      state.pushDiagnostic='Notifikacije su uključene.';
       state.pushDiagnosticType='ok';
     }else{
-      state.pushDiagnostic='Push još nije uključen na ovom uređaju.';
+      state.pushDiagnostic='Notifikacije još nisu uključene.';
       state.pushDiagnosticType='neutral';
     }
   }catch(err){
     state.pushEnabled=false;
-    state.pushDiagnostic='Provera push-a nije uspela: '+(err?.message||String(err));
+    state.pushDiagnostic='Provera notifikacija nije uspela: '+(err?.message||String(err));
     state.pushDiagnosticType='error';
+  }finally{
+    state.pushChecked=true;
   }
 }
 async function ensurePushSubscription(forceReset=false){
@@ -2100,7 +2103,7 @@ async function runLocalNotificationTest(reg){
       icon:'/najava-icon.svg',
       badge:'/najava-icon.svg',
       tag:'najavi-local-test-'+Date.now(),
-      data:{url:'/'}
+      data:{url:'/app/'}
     });
     return true;
   }catch(err){
@@ -2147,8 +2150,17 @@ async function testPush(){
   }
 }
 async function installApp(){
-  if(!deferredInstallPrompt){toast('Browser trenutno ne nudi direktnu instalaciju. Koristi meni browsera.');return}
-  deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;state.installPromptReady=false;render();
+  if(!deferredInstallPrompt){
+    if(isIOS()){state.installOnboarding=true;render();return}
+    toast('Ako nema dugmeta: Chrome meni ⋮ → Install app / Add to Home screen.');
+    return;
+  }
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt=null;
+  state.installPromptReady=false;
+  state.installOnboarding=false;
+  render();
 }
 async function loadHistory(){
   if(!state.user)return;
@@ -2179,7 +2191,7 @@ function toast(msg){ const old=document.querySelector('.toast'); if(old) old.rem
 function escapeHtml(s=''){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
 function escapeAttr(s=''){return escapeHtml(s)}
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();deferredInstallPrompt=event;state.installPromptReady=true;if(state.authChecked)render()});
-window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;state.installPromptReady=false;if(state.authChecked)render()});
+window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;state.installPromptReady=false;state.installOnboarding=false;if(state.user){checkPushStatus().then(render)}else if(state.authChecked)render()});
 async function init(){
   const resetToken=new URLSearchParams(location.search).get('reset');
   if(resetToken){
