@@ -333,6 +333,12 @@ svg{stroke:currentColor;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .form-field input,.form-field select{width:100%;padding:11px 13px;border-radius:12px;border:1px solid var(--line);background:#fff;font-size:12px;color:var(--ink)}
 .form-field input:focus,.form-field select:focus{border-color:#9fd0aa;box-shadow:0 0 0 3px rgba(97,185,120,.10)}
 .auth-error{padding:9px 11px;border-radius:11px;background:#fff2f0;color:#a5483e;font-size:10px;margin-bottom:12px}
+.auth-success{padding:10px 11px;border-radius:11px;background:#eef9f1;color:#2f7544;border:1px solid #d3ead8;font-size:10px;line-height:1.5;margin-bottom:12px}
+.auth-link-row{display:flex;justify-content:flex-end;margin:-3px 0 13px}
+.auth-link{border:0;background:transparent;padding:0;color:var(--green-6);font-size:10px;font-weight:700;cursor:pointer}
+.auth-link:hover{text-decoration:underline}
+.auth-back{display:inline-flex;margin-top:14px;border:0;background:transparent;padding:0;color:#607164;font-size:10px;font-weight:600;cursor:pointer}
+.auth-back:hover{color:var(--green-6)}
 .auth-foot{margin-top:13px;color:var(--muted);font-size:9px;line-height:1.5}
 .loading-screen{min-height:100vh;display:grid;place-items:center;color:var(--muted);font-size:13px}
 .spinner{width:34px;height:34px;border:3px solid #dcebdd;border-top-color:var(--green-5);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 10px}
@@ -1378,6 +1384,8 @@ const state = {
   user:null,
   authMode:'login',
   authError:'',
+  authMessage:'',
+  resetToken:'',
   profileOpen:false,
   expandedEventId:null,
   pushEnabled:false,
@@ -1496,7 +1504,48 @@ function sourceStatus(){
 
 function loadingScreen(){return `<div class="loading-screen"><div><div class="spinner"></div>Učitavanje aplikacije…</div></div>`}
 function authScreen(){
-  const register=state.authMode==='register';
+  const mode=state.authMode;
+  const register=mode==='register';
+  const forgot=mode==='forgot';
+  const reset=mode==='reset';
+
+  let card='';
+  if(reset){
+    card=`<h2>Postavite novu lozinku</h2>
+      <p>Unesite novu lozinku za svoj Najavi nalog.</p>
+      ${state.authError?`<div class="auth-error">${escapeHtml(state.authError)}</div>`:''}
+      ${state.authMessage?`<div class="auth-success">${escapeHtml(state.authMessage)}</div>`:''}
+      <form id="resetPasswordForm">
+        <div class="form-field"><label>Nova lozinka</label><input type="password" name="password" autocomplete="new-password" required minlength="8" placeholder="Najmanje 8 karaktera"></div>
+        <div class="form-field"><label>Ponovite lozinku</label><input type="password" name="confirmPassword" autocomplete="new-password" required minlength="8" placeholder="Ponovite novu lozinku"></div>
+        <button class="btn-primary" style="width:100%" type="submit">Promeni lozinku</button>
+      </form>
+      <button class="auth-back" type="button" data-auth-mode="login">← Nazad na prijavu</button>`;
+  }else if(forgot){
+    card=`<h2>Zaboravili ste lozinku?</h2>
+      <p>Unesite email naloga. Poslaćemo vam jednokratni link za postavljanje nove lozinke.</p>
+      ${state.authError?`<div class="auth-error">${escapeHtml(state.authError)}</div>`:''}
+      ${state.authMessage?`<div class="auth-success">${escapeHtml(state.authMessage)}</div>`:''}
+      <form id="forgotPasswordForm">
+        <div class="form-field"><label>Email</label><input type="email" name="email" autocomplete="email" required placeholder="ime@email.com"></div>
+        <button class="btn-primary" style="width:100%" type="submit">Pošalji reset link</button>
+      </form>
+      <button class="auth-back" type="button" data-auth-mode="login">← Nazad na prijavu</button>`;
+  }else{
+    card=`<h2>${register?'Napravi nalog':'Dobro došao'}</h2>
+      <p>${register?'Sačuvaj adrese i uključi obaveštenja.':'Prijavi se da vidiš svoje adrese i najave.'}</p>
+      <div class="auth-tabs"><button class="auth-tab ${!register?'active':''}" data-auth-mode="login">Prijava</button><button class="auth-tab ${register?'active':''}" data-auth-mode="register">Registracija</button></div>
+      ${state.authError?`<div class="auth-error">${escapeHtml(state.authError)}</div>`:''}
+      ${state.authMessage?`<div class="auth-success">${escapeHtml(state.authMessage)}</div>`:''}
+      <form id="authForm">
+        <div class="form-field"><label>Email</label><input type="email" name="email" autocomplete="email" required placeholder="ime@email.com"></div>
+        <div class="form-field"><label>Lozinka</label><input type="password" name="password" autocomplete="${register?'new-password':'current-password'}" required minlength="8" placeholder="Najmanje 8 karaktera"></div>
+        ${!register?`<div class="auth-link-row"><button class="auth-link" type="button" data-auth-mode="forgot">Zaboravili ste lozinku?</button></div>`:''}
+        <button class="btn-primary" style="width:100%" type="submit">${register?'Napravi nalog':'Prijavi se'}</button>
+      </form>
+      <div class="auth-foot">Sigurna prijava putem emaila i lozinke.</div>`;
+  }
+
   return `<div class="auth-page">
     <section class="auth-brand">
       <div>
@@ -1511,18 +1560,7 @@ function authScreen(){
       </div>
       <div class="logo-sub">Najavi · obaveštenja za tvoje adrese.</div>
     </section>
-    <div class="auth-panel-wrap"><div class="auth-card">
-      <h2>${register?'Napravi nalog':'Dobro došao'}</h2>
-      <p>${register?'Sačuvaj adrese i uključi obaveštenja.':'Prijavi se da vidiš svoje adrese i najave.'}</p>
-      <div class="auth-tabs"><button class="auth-tab ${!register?'active':''}" data-auth-mode="login">Prijava</button><button class="auth-tab ${register?'active':''}" data-auth-mode="register">Registracija</button></div>
-      ${state.authError?`<div class="auth-error">${escapeHtml(state.authError)}</div>`:''}
-      <form id="authForm">
-        <div class="form-field"><label>Email</label><input type="email" name="email" autocomplete="email" required placeholder="ime@email.com"></div>
-        <div class="form-field"><label>Lozinka</label><input type="password" name="password" autocomplete="${register?'new-password':'current-password'}" required minlength="8" placeholder="Najmanje 8 karaktera"></div>
-        <button class="btn-primary" style="width:100%" type="submit">${register?'Napravi nalog':'Prijavi se'}</button>
-      </form>
-      <div class="auth-foot">MVP prijava koristi email i lozinku. Reset lozinke ćemo dodati pre javnog lansiranja.</div>
-    </div></div>
+    <div class="auth-panel-wrap"><div class="auth-card">${card}</div></div>
   </div>`;
 }
 function layout(){
@@ -1775,7 +1813,17 @@ function render(){
 }
 function bind(){
   document.querySelectorAll('[data-tab]').forEach(el=>el.onclick=()=>{state.tab=el.dataset.tab;state.profileOpen=false;state.mobileMenuOpen=false;render();if(state.tab==='announcements')loadHistory()});
-  document.querySelectorAll('[data-auth-mode]').forEach(el=>el.onclick=()=>{state.authMode=el.dataset.authMode;state.authError='';render()});
+  document.querySelectorAll('[data-auth-mode]').forEach(el=>el.onclick=()=>{
+    const next=el.dataset.authMode;
+    if(next==='login'&&state.resetToken){
+      state.resetToken='';
+      history.replaceState({},'',location.pathname);
+    }
+    state.authMode=next;
+    state.authError='';
+    state.authMessage='';
+    render();
+  });
   const authForm=document.getElementById('authForm');
   if(authForm)authForm.onsubmit=async e=>{
     e.preventDefault(); state.authError='';
@@ -1788,6 +1836,67 @@ function bind(){
       await loadUserData(); await loadOutages(); await checkPushStatus(); render();
     }catch(err){state.authError=err.message||String(err);render()}
   };
+
+  const forgotForm=document.getElementById('forgotPasswordForm');
+  if(forgotForm)forgotForm.onsubmit=async e=>{
+    e.preventDefault();
+    state.authError='';
+    state.authMessage='';
+    const fd=new FormData(forgotForm);
+    const email=String(fd.get('email')||'').trim();
+    try{
+      const res=await fetch('/api/auth',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({action:'request-reset',email})
+      });
+      const data=await res.json();
+      if(!res.ok)throw new Error(data.error||'Reset link nije poslat.');
+      state.authMessage=data.message||'Ako nalog postoji, poslali smo reset link.';
+      render();
+    }catch(err){
+      state.authError=err.message||String(err);
+      render();
+    }
+  };
+
+  const resetForm=document.getElementById('resetPasswordForm');
+  if(resetForm)resetForm.onsubmit=async e=>{
+    e.preventDefault();
+    state.authError='';
+    state.authMessage='';
+    const fd=new FormData(resetForm);
+    const password=String(fd.get('password')||'');
+    const confirmPassword=String(fd.get('confirmPassword')||'');
+    if(password!==confirmPassword){
+      state.authError='Lozinke se ne poklapaju.';
+      render();
+      return;
+    }
+    try{
+      const res=await fetch('/api/auth',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({action:'reset-password',token:state.resetToken,password})
+      });
+      const data=await res.json();
+      if(!res.ok)throw new Error(data.error||'Promena lozinke nije uspela.');
+      state.user=data.user;
+      state.resetToken='';
+      state.authMode='login';
+      state.authChecked=true;
+      history.replaceState({},'',location.pathname);
+      await loadUserData();
+      await loadOutages();
+      await checkPushStatus();
+      render();
+      toast('Lozinka je uspešno promenjena.');
+    }catch(err){
+      state.authError=err.message||String(err);
+      render();
+    }
+  };
+
   document.querySelectorAll('[data-action="add-address"]').forEach(el=>el.onclick=()=>{ if(state.addresses.length>=CONFIG.maxAddresses) return toast('Maksimalno 3 adrese u V1.'); state.modal='address'; state.editId=null; render(); });
   document.querySelectorAll('[data-edit]').forEach(el=>el.onclick=()=>{ state.modal='address'; state.editId=el.dataset.edit; render(); });
   document.querySelectorAll('[data-action="close-modal"]').forEach(el=>el.onclick=()=>{ state.modal=null; state.editId=null; render(); });
@@ -2011,6 +2120,16 @@ function escapeAttr(s=''){return escapeHtml(s)}
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();deferredInstallPrompt=event;state.installPromptReady=true;if(state.authChecked)render()});
 window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;state.installPromptReady=false;if(state.authChecked)render()});
 async function init(){
+  const resetToken=new URLSearchParams(location.search).get('reset');
+  if(resetToken){
+    state.resetToken=resetToken;
+    state.authMode='reset';
+    state.user=null;
+    state.authChecked=true;
+    render();
+    await registerSW();
+    return;
+  }
   render();
   await registerSW();
   await checkAuth();
