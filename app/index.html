@@ -1460,6 +1460,9 @@ const state = {
   mobileMenuOpen:false
 };
 let deferredInstallPrompt=null;
+const AUTO_REFRESH_MS=30*60*1000;
+let autoRefreshTimer=null;
+let lastAppRefreshAt=0;
 const VAPID_PUBLIC_KEY="BHBtTXTkxIfknGZ8bfNgLyvPrV4QBTTZSb27sb7cCDxwn8lih60mIByLZITKEnK7PoXtPIF_kOkGmJWpLJIey90";
 
 const icons = {
@@ -1942,7 +1945,7 @@ function bind(){
       if(!res.ok)throw new Error(data.error||'Prijava nije uspela.');
       state.user=data.user; state.authChecked=true;
       state.installOnboarding=isMobileDevice() && !isStandalone();
-      await loadUserData(); await loadOutages(); await checkPushStatus(); render();
+      await loadUserData(); await loadOutages(); await checkPushStatus(); startAutoRefresh(); render();
     }catch(err){state.authError=err.message||String(err);render()}
   };
 
@@ -1998,6 +2001,7 @@ function bind(){
       await loadUserData();
       await loadOutages();
       await checkPushStatus();
+      startAutoRefresh();
       render();
       toast('Lozinka je uspešno promenjena.');
     }catch(err){
@@ -2036,6 +2040,7 @@ async function checkAuth(){
 }
 async function logoutUser(){
   await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'logout'})}).catch(()=>{});
+  stopAutoRefresh();
   state.user=null;state.profileOpen=false;state.expandedEventId=null;render();
 }
 async function loadUserData(){
@@ -2229,6 +2234,7 @@ async function loadOutages(){
     state.events=Array.isArray(data.events)?data.events:[];
     state.sources=data.sources||{};
     state.lastChecked=new Intl.DateTimeFormat('sr-Latn-RS',{hour:'2-digit',minute:'2-digit'}).format(new Date(data.generatedAt||Date.now()));
+    lastAppRefreshAt=Date.now();
   }catch(e){
     state.events=[];
     state.sources={};
@@ -2237,11 +2243,24 @@ async function loadOutages(){
     state.loading=false; render();
   }
 }
+function stopAutoRefresh(){
+  if(autoRefreshTimer){clearInterval(autoRefreshTimer);autoRefreshTimer=null}
+}
+function startAutoRefresh(){
+  stopAutoRefresh();
+  if(!state.user)return;
+  autoRefreshTimer=setInterval(()=>{
+    if(document.visibilityState==='visible'&&state.user&&!state.loading)loadOutages();
+  },AUTO_REFRESH_MS);
+}
 function toast(msg){ const old=document.querySelector('.toast'); if(old) old.remove(); const el=document.createElement('div'); el.className='toast'; el.textContent=msg; document.body.appendChild(el); setTimeout(()=>el.remove(),2200); }
 function escapeHtml(s=''){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
 function escapeAttr(s=''){return escapeHtml(s)}
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();deferredInstallPrompt=event;state.installPromptReady=true;if(state.authChecked)render()});
 window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;state.installPromptReady=false;state.installOnboarding=false;if(state.user){checkPushStatus().then(render)}else if(state.authChecked)render()});
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'&&state.user&&!state.loading&&Date.now()-lastAppRefreshAt>=AUTO_REFRESH_MS)loadOutages();
+});
 async function init(){
   const params=new URLSearchParams(location.search);
   const resetToken=params.get('reset');
@@ -2260,7 +2279,8 @@ async function init(){
   await checkAuth();
   if(state.user){
     state.installOnboarding=isMobileDevice() && !isStandalone();
-    await loadUserData();await checkPushStatus();await Promise.all([loadOutages(),loadHistory()])
+    await loadUserData();await checkPushStatus();await Promise.all([loadOutages(),loadHistory()]);
+    startAutoRefresh();
   }
   render();
 }
