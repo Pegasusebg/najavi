@@ -11,7 +11,7 @@ function adminEmails(){
 function isAdmin(email:string){ return adminEmails().has(normalizeEmail(email)); }
 
 function analyticsStore(){
-  const production=Netlify.context?.deploy?.context==="production";
+  const production=Netlify.env.get("CONTEXT")==="production";
   return production
     ? getStore("najava-analytics",{consistency:"strong"})
     : getDeployStore("najava-analytics");
