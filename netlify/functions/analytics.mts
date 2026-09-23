@@ -3,6 +3,7 @@ import { json, requireSession, normalizeEmail, sha } from "./_shared/auth.mts";
 
 const DEFAULT_ADMIN_EMAILS=["office@studio7.rs","goran@studio7.rs"];
 const TRACKING_STARTED_AT="2026-09-23T19:49:00Z";
+const LANDING_TRACKING_STARTED_AT="2026-09-23T21:10:00Z";
 
 function adminEmails(){
   const configured=String(Netlify.env.get("NAJAVI_ADMIN_EMAILS")||"")
@@ -15,36 +16,87 @@ function internalEmails(){
     .split(",").map(normalizeEmail).filter(Boolean);
   return new Set([...adminEmails(),...configured]);
 }
-
 function analyticsStore(){
   const production=Netlify.env.get("CONTEXT")==="production";
   return production
     ? getStore("najava-analytics",{consistency:"strong"})
     : getDeployStore("najava-analytics");
 }
-function safeDeviceId(value:any){
+function safeId(value:any){
   const raw=String(value||"").trim();
-  return raw.length>=8&&raw.length<=160?raw:"";
+  return raw.length>=8&&raw.length<=180?raw:"";
 }
-function dayKey(date=new Date()){
+function belgradeDayKey(value:Date|string|number=new Date()){
+  const d=value instanceof Date?value:new Date(value);
+  const parts=new Intl.DateTimeFormat("en-GB",{
+    timeZone:"Europe/Belgrade",year:"numeric",month:"2-digit",day:"2-digit"
+  }).formatToParts(d);
+  const get=(type:string)=>parts.find(p=>p.type===type)?.value||"";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+function shiftDay(day:string,delta:number){
+  const [y,m,d]=day.split("-").map(Number);
+  const date=new Date(Date.UTC(y,m-1,d+delta,12,0,0));
   return date.toISOString().slice(0,10);
 }
-function daysAgo(n:number){
-  return Date.now()-n*86400000;
+function validDay(value:string|null){
+  return Boolean(value&&/^\d{4}-\d{2}-\d{2}$/.test(value));
+}
+function resolveRange(url:URL){
+  const key=String(url.searchParams.get("range")||"30d");
+  const today=belgradeDayKey();
+  if(key==="all")return {key,from:"0001-01-01",to:today};
+  if(key==="today")return {key,from:today,to:today};
+  if(key==="custom"){
+    const from=String(url.searchParams.get("from")||"");
+    const to=String(url.searchParams.get("to")||"");
+    if(!validDay(from)||!validDay(to)||from>to)return null;
+    return {key,from,to};
+  }
+  const days=key==="7d"?7:key==="90d"?90:30;
+  return {key:days+"d",from:shiftDay(today,-(days-1)),to:today};
+}
+function inRangeDay(day:string,range:{from:string,to:string}){
+  return day>=range.from&&day<=range.to;
+}
+function inRangeIso(value:any,range:{from:string,to:string}){
+  if(!value)return false;
+  const d=new Date(value);
+  if(Number.isNaN(d.getTime()))return false;
+  return inRangeDay(belgradeDayKey(d),range);
 }
 
 export default async(req:Request)=>{
-  const {error,session}=await requireSession(req); if(error)return error;
   const analytics=analyticsStore();
 
   if(req.method==="POST"){
     const body=await req.json().catch(()=>({})) as any;
     const event=String(body.event||"");
-    const deviceId=safeDeviceId(body.deviceId);
-    if(!deviceId)return json({error:"Nedostaje identifikator uređaja."},400);
-
-    const deviceHash=sha(deviceId);
     const now=new Date().toISOString();
+
+    // Landing analytics is deliberately anonymous and does not require login.
+    if(event==="landing_view"){
+      const visitorId=safeId(body.visitorId);
+      const viewId=safeId(body.viewId);
+      if(!visitorId||!viewId)return json({error:"Neispravan analytics identifikator."},400);
+      const day=belgradeDayKey();
+      const visitorHash=sha(visitorId);
+      const viewHash=sha(viewId);
+      await Promise.all([
+        analytics.setJSON(`landing-visitor/${day}/${visitorHash}`,{
+          firstSeenAt:now,lastSeenAt:now,path:"/"
+        }),
+        analytics.setJSON(`landing-view/${day}/${viewHash}`,{
+          visitorHash,at:now,path:"/"
+        })
+      ]);
+      return json({ok:true});
+    }
+
+    const {error,session}=await requireSession(req); if(error)return error;
+    const deviceId=safeId(body.deviceId);
+    if(!deviceId)return json({error:"Nedostaje identifikator uređaja."},400);
+    const deviceHash=sha(deviceId);
     const ua=req.headers.get("user-agent")||"";
 
     if(event==="install"){
@@ -60,8 +112,22 @@ export default async(req:Request)=>{
       return json({ok:true});
     }
 
+    if(event==="push_enabled"){
+      const key=`push-enabled/${session!.userId}/${deviceHash}`;
+      const existing=await analytics.get(key,{type:"json"}) as any;
+      await analytics.setJSON(key,{
+        userId:session!.userId,
+        firstEnabledAt:existing?.firstEnabledAt||now,
+        lastSeenAt:now,
+        source:String(body.source||"app").slice(0,40),
+        userAgent:ua.slice(0,300)
+      });
+      return json({ok:true});
+    }
+
     if(event==="app_open"){
-      const key=`open/${dayKey()}/${session!.userId}/${deviceHash}`;
+      const day=belgradeDayKey();
+      const key=`open/${day}/${session!.userId}/${deviceHash}`;
       const existing=await analytics.get(key,{type:"json"}) as any;
       const row={
         userId:session!.userId,
@@ -71,7 +137,6 @@ export default async(req:Request)=>{
         userAgent:ua.slice(0,300)
       };
       await analytics.setJSON(key,row);
-
       const activityKey=`activity/${session!.userId}/${deviceHash}`;
       const activity=await analytics.get(activityKey,{type:"json"}) as any;
       await analytics.setJSON(activityKey,{
@@ -88,111 +153,96 @@ export default async(req:Request)=>{
   }
 
   if(req.method!=="GET")return json({error:"Method not allowed"},405);
+  const {error,session}=await requireSession(req); if(error)return error;
   if(!isAdmin(session!.email))return json({error:"Nemate pristup analitici."},403);
+
+  const range=resolveRange(new URL(req.url));
+  if(!range)return json({error:"Neispravan vremenski raspon."},400);
 
   const auth=getStore("najava-auth",{consistency:"strong"});
   const push=getStore("najava-push",{consistency:"strong"});
-  const [userList,installList,pushList,activityList,openList]=await Promise.all([
+  const [userList,installList,pushList,pushEnabledList,openList,landingVisitorList,landingViewList]=await Promise.all([
     auth.list({prefix:"user/"}),
     analytics.list({prefix:"install/"}),
     push.list(),
-    analytics.list({prefix:"activity/"}),
-    analytics.list({prefix:"open/"})
+    analytics.list({prefix:"push-enabled/"}),
+    analytics.list({prefix:"open/"}),
+    analytics.list({prefix:"landing-visitor/"}),
+    analytics.list({prefix:"landing-view/"})
   ]);
 
-  const [users,installs,pushRows,activities,openRows]=await Promise.all([
+  const [users,installs,pushEnabledRows]=await Promise.all([
     Promise.all(userList.blobs.map(b=>auth.get(b.key,{type:"json"}) as Promise<any>)),
     Promise.all(installList.blobs.map(b=>analytics.get(b.key,{type:"json"}) as Promise<any>)),
-    Promise.all(pushList.blobs.map(b=>push.get(b.key,{type:"json"}) as Promise<any>)),
-    Promise.all(activityList.blobs.map(b=>analytics.get(b.key,{type:"json"}) as Promise<any>)),
-    Promise.all(openList.blobs.map(b=>analytics.get(b.key,{type:"json"}) as Promise<any>))
+    Promise.all(pushEnabledList.blobs.map(b=>analytics.get(b.key,{type:"json"}) as Promise<any>))
   ]);
 
   const internal=internalEmails();
   const validUsers=users.filter(u=>u?.id&&u?.email);
-  const internalUsers=validUsers.filter(u=>internal.has(normalizeEmail(u.email)));
   const customerUsers=validUsers.filter(u=>!internal.has(normalizeEmail(u.email)));
   const customerIds=new Set(customerUsers.map(u=>String(u.id)));
 
-  const cutoff1=daysAgo(1);
-  const cutoff7=daysAgo(7);
-  const cutoff30=daysAgo(30);
+  const totalRegisteredAccounts=customerUsers.length;
+  const registrationsInRange=customerUsers.filter(u=>inRangeIso(u?.createdAt,range)).length;
 
-  const customerAccounts=customerUsers.length;
-  const accounts7d=customerUsers.filter(u=>u?.createdAt&&new Date(u.createdAt).getTime()>=cutoff7).length;
+  const activeAccountIds=new Set<string>();
+  for(const blob of openList.blobs){
+    const parts=String(blob.key).split("/");
+    if(parts.length<4)continue;
+    const day=parts[1],userId=parts[2];
+    if(customerIds.has(userId)&&inRangeDay(day,range))activeAccountIds.add(userId);
+  }
 
   const installRows=installs.map((row,i)=>{
     const keyUserId=String(installList.blobs[i]?.key||"").split("/")[1]||"";
     return {...(row||{}),userId:String(row?.userId||keyUserId)};
   }).filter(row=>customerIds.has(row.userId));
+  const installedUserIdsAll=new Set(installRows.map(row=>row.userId));
+  const installedInRange=new Set(
+    installRows.filter(row=>inRangeIso(row?.firstInstalledAt,range)).map(row=>row.userId)
+  );
 
-  const everInstalledUserIds=new Set(installRows.map(row=>row.userId));
-  const installs7d=installRows.filter(row=>row?.firstInstalledAt&&new Date(row.firstInstalledAt).getTime()>=cutoff7);
-  const installedUsers7d=new Set(installs7d.map(row=>row.userId)).size;
-  const activeInstallRows30d=installRows.filter(row=>row?.lastSeenAt&&new Date(row.lastSeenAt).getTime()>=cutoff30);
-  const activeInstallUsers30d=new Set(activeInstallRows30d.map(row=>row.userId));
-
-  const customerPushRows=pushRows.map((row,i)=>{
-    const keyUserId=String(pushList.blobs[i]?.key||"").split("/")[0]||"";
+  const pushEnabledRowsNormalized=pushEnabledRows.map((row,i)=>{
+    const keyUserId=String(pushEnabledList.blobs[i]?.key||"").split("/")[1]||"";
     return {...(row||{}),userId:String(row?.userId||keyUserId)};
   }).filter(row=>customerIds.has(row.userId));
-  const pushUserIds=new Set(customerPushRows.map(row=>row.userId));
+  const notificationsEnabledInRange=new Set(
+    pushEnabledRowsNormalized.filter(row=>inRangeIso(row?.firstEnabledAt,range)).map(row=>row.userId)
+  );
 
-  // Merge compact activity summaries with historical daily-open rows so the
-  // dashboard remains correct across the analytics upgrade.
-  const activityByDevice=new Map<string,{userId:string,lastOpenedAt:string,installed:boolean}>();
-  const absorb=(row:any,keyFallback="")=>{
-    const userId=String(row?.userId||keyFallback);
-    const lastOpenedAt=String(row?.lastOpenedAt||row?.firstOpenedAt||"");
-    if(!customerIds.has(userId)||!lastOpenedAt)return;
-    const deviceKey=String(row?.deviceHash||"");
-    const key=deviceKey?`${userId}/${deviceKey}`:`${userId}/${sha(String(row?.userAgent||"")+"|"+lastOpenedAt.slice(0,10))}`;
-    const prev=activityByDevice.get(key);
-    if(!prev||new Date(lastOpenedAt).getTime()>new Date(prev.lastOpenedAt).getTime()){
-      activityByDevice.set(key,{userId,lastOpenedAt,installed:Boolean(row?.installed)});
-    }
-  };
-  activities.forEach((row,i)=>{
-    const parts=String(activityList.blobs[i]?.key||"").split("/");
-    absorb({...row,deviceHash:parts[2]||""},parts[1]||"");
-  });
-  openRows.forEach((row,i)=>{
-    const parts=String(openList.blobs[i]?.key||"").split("/");
-    absorb({...row,deviceHash:parts[3]||""},parts[2]||"");
-  });
+  const currentPushUserIds=new Set(
+    pushList.blobs
+      .map(b=>String(b.key).split("/")[0]||"")
+      .filter(id=>customerIds.has(id))
+  );
 
-  const activeUsersSince=(cutoff:number)=>{
-    const ids=new Set<string>();
-    for(const row of activityByDevice.values()){
-      if(new Date(row.lastOpenedAt).getTime()>=cutoff)ids.add(row.userId);
-    }
-    return ids.size;
-  };
-
-  const activeUsers1d=activeUsersSince(cutoff1);
-  const activeUsers7d=activeUsersSince(cutoff7);
-  const activeUsers30d=activeUsersSince(cutoff30);
-  const conversion=customerAccounts?Math.round((everInstalledUserIds.size/customerAccounts)*1000)/10:0;
+  const landingUniqueSet=new Set<string>();
+  for(const blob of landingVisitorList.blobs){
+    const parts=String(blob.key).split("/");
+    if(parts.length<3)continue;
+    if(inRangeDay(parts[1],range))landingUniqueSet.add(parts[2]);
+  }
+  let landingPageViews=0;
+  for(const blob of landingViewList.blobs){
+    const parts=String(blob.key).split("/");
+    if(parts.length>=3&&inRangeDay(parts[1],range))landingPageViews++;
+  }
 
   return json({
     generatedAt:new Date().toISOString(),
     trackingStartedAt:TRACKING_STARTED_AT,
-    customerAccounts,
-    totalAccounts:customerAccounts,
-    accounts7d,
-    internalAccounts:internalUsers.length,
-    everInstalledUsers:everInstalledUserIds.size,
-    installedUsers:everInstalledUserIds.size,
-    installedUsers7d,
-    deviceInstallations:installRows.length,
-    activeInstallUsers30d:activeInstallUsers30d.size,
-    activeInstallDevices30d:activeInstallRows30d.length,
-    pushUsers:pushUserIds.size,
-    pushDevices:customerPushRows.length,
-    activeUsers1d,
-    activeUsers7d,
-    activeUsers30d,
-    accountToInstallConversion:conversion
+    landingTrackingStartedAt:LANDING_TRACKING_STARTED_AT,
+    range,
+    landingUniqueVisitors:landingUniqueSet.size,
+    landingPageViews,
+    registrationsInRange,
+    activeRegisteredAccounts:activeAccountIds.size,
+    totalRegisteredAccounts,
+    notificationsEnabledInRange:notificationsEnabledInRange.size,
+    currentPushUsers:currentPushUserIds.size,
+    installsInRange:installedInRange.size,
+    everInstalledUsers:installedUserIdsAll.size,
+    deviceInstallations:installRows.length
   });
 };
 
