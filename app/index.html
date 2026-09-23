@@ -1821,40 +1821,41 @@ function historyItem(item){
   return `<div class="history-item"><div class="history-icon">${item.utility==='water'?icon('water'):icon('bell')}</div><div class="history-copy"><strong>${escapeHtml(item.title||'Notifikacija')}</strong><span>${escapeHtml(item.body||'')}</span><small>${kind} · ${when}</small></div></div>`;
 }
 function settings(){
-  const standalone=window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone===true;
-  const ios=/iphone|ipad|ipod/i.test(navigator.userAgent);
-  const mobileDevice=/android|iphone|ipad|ipod/i.test(navigator.userAgent) || window.matchMedia?.('(max-width: 860px)').matches;
+  const standalone=isStandalone();
+  const ios=isIOS();
+  const mobileDevice=isMobileDevice();
   const installCopy=standalone
-    ? '<p>Aplikacija je pokrenuta kao instalirana web aplikacija.</p>'
+    ? '<p>Aplikacija je instalirana na ovom uređaju.</p>'
     : ios
-      ? '<p>Na iPhone/iPad uređaju instalacija ide kroz Share meni.</p><ol class="install-steps"><li>Otvori ovu stranicu u browseru.</li><li>Tapni <strong>Share</strong>.</li><li>Izaberi <strong>Add to Home Screen / Dodaj na početni ekran</strong>.</li><li>Otvori Najavi sa nove ikonice, pa uključi push.</li></ol>'
-      : '<p>Na Androidu koristi dugme Instaliraj ako je dostupno. Ako nije: Chrome meni ⋮ → Install app / Add to Home screen.</p>';
-  return `<section class="hero"><div class="eyebrow">Podešavanja</div><h1>Obaveštenja</h1><p>Izaberi tačno koja upozorenja želiš da primaš.</p></section>
+      ? '<p>Dodaj Najavi na početni ekran, pa je otvori sa ikonice.</p>'+iosInstallGuide()
+      : '<p>Chrome → Instaliraj aplikaciju. Ako dugme nije dostupno: meni ⋮ → Install app / Add to Home screen.</p>';
+  return \`<section class="hero"><div class="eyebrow">Podešavanja</div><h1>Obaveštenja</h1><p>Podesi kada želiš da te Najavi upozori.</p></section>
   <div class="settings-grid">
     <div class="card settings-card">
       <div class="card-head"><div><h3>Vreme upozorenja</h3><p>Možeš uključiti više opcija.</p></div></div>
       <div class="pref-list">
-        ${prefRow('dayBefore','24 sata ranije','Glavno upozorenje dan pre planiranog prekida.')}
-        ${prefRow('morning','Podsetnik tog jutra','Kratko podsećanje između 07:00 i 09:00 na dan prekida.')}
-        ${prefRow('twoHours','2 sata ranije','Dodatno upozorenje neposredno pre početka.')}
+        \${prefRow('dayBefore','24 sata ranije','Glavno upozorenje dan pre planiranog prekida.')}
+        \${prefRow('morning','Podsetnik tog jutra','Kratko podsećanje između 07:00 i 09:00 na dan prekida.')}
+        \${prefRow('twoHours','2 sata ranije','Dodatno upozorenje neposredno pre početka.')}
       </div>
     </div>
     <div class="stack">
       <div class="push-box">
         <h4>Push notifikacije</h4>
-        <p>Notifikacije stižu i kada aplikacija nije otvorena. Na iOS-u je prvo instaliraj na Home Screen.</p>
-        <div class="push-state ${state.pushEnabled?'on':''}">${state.pushEnabled?'● Push uključen':'○ Push nije uključen'}</div>
-        ${state.pushDiagnostic?`<div class="push-diagnostic ${state.pushDiagnosticType||'neutral'}">${escapeHtml(state.pushDiagnostic)}</div>`:''}
-        <div class="action-row"><button class="btn-compact primary" data-action="enable-push">${state.pushEnabled?'Ponovo registruj':'Uključi push'}</button><button class="btn-compact" data-action="test-push">Test notifikacija</button></div>
+        <p>\${state.pushEnabled?'Uključene su na ovom uređaju.':'Uključi ih da Najavi može da ti javi na vreme.'}</p>
+        <div class="push-state \${state.pushEnabled?'on':''}">\${state.pushEnabled?'● Push uključen':'○ Push nije uključen'}</div>
+        \${state.pushDiagnostic?\`<div class="push-diagnostic \${state.pushDiagnosticType||'neutral'}">\${escapeHtml(state.pushDiagnostic)}</div>\`:''}
+        <div class="action-row"><button class="btn-compact primary" data-action="enable-push">\${state.pushEnabled?'Ponovo registruj':'Uključi notifikacije'}</button><button class="btn-compact" data-action="test-push">Test</button></div>
       </div>
-      ${mobileDevice?`<div class="install-box">
+      \${mobileDevice?\`<div class="install-box">
         <h4>Instaliraj Najavi</h4>
-        ${installCopy}
-        <div class="action-row">${!standalone&&!ios?`<button class="btn-compact primary" data-action="install-app" ${deferredInstallPrompt?'':'disabled'}>Instaliraj aplikaciju</button>`:''}</div>
-      </div>`:''}
+        \${installCopy}
+        <div class="action-row">\${!standalone&&!ios?\`<button class="btn-compact primary" data-action="install-app" \${deferredInstallPrompt?'':'disabled'}>Instaliraj aplikaciju</button>\`:''}</div>
+      </div>\`:''}
     </div>
-  </div>`;
+  </div>\`;
 }
+
 function prefRow(key,title,desc){
   return `<label class="pref-row"><div class="pref-copy"><strong>${title}</strong><span>${desc}</span></div><span class="check-wrap"><input class="pref-check" type="checkbox" data-pref-check="${key}" ${state.prefs[key]?'checked':''}><span class="checkbox-ui">✓</span></span></label>`;
 }
@@ -1888,7 +1889,9 @@ function bind(){
       const res=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:state.authMode,email,password})});
       const data=await res.json();
       if(!res.ok)throw new Error(data.error||'Prijava nije uspela.');
+      const justRegistered=state.authMode==='register';
       state.user=data.user; state.authChecked=true;
+      state.installOnboarding=justRegistered && isMobileDevice() && !isStandalone();
       await loadUserData(); await loadOutages(); await checkPushStatus(); render();
     }catch(err){state.authError=err.message||String(err);render()}
   };
@@ -1967,7 +1970,9 @@ function bind(){
   const enablePushBtn=document.querySelector('[data-action="enable-push"]'); if(enablePushBtn)enablePushBtn.onclick=enablePush;
   const testPushBtn=document.querySelector('[data-action="test-push"]'); if(testPushBtn)testPushBtn.onclick=testPush;
   const refreshHistory=document.querySelector('[data-action="refresh-history"]'); if(refreshHistory)refreshHistory.onclick=loadHistory;
-  const installBtn=document.querySelector('[data-action="install-app"]'); if(installBtn)installBtn.onclick=installApp;
+  document.querySelectorAll('[data-action="install-app"]').forEach(el=>el.onclick=installApp);
+  document.querySelectorAll('[data-action="dismiss-install-onboarding"]').forEach(el=>el.onclick=()=>{state.installOnboarding=false;render()});
+  document.querySelectorAll('[data-action="show-install-guide"]').forEach(el=>el.onclick=()=>{state.installOnboarding=true;render()});
   const del=document.querySelector('[data-action="delete-address"]'); if(del) del.onclick=()=>{ state.addresses=state.addresses.filter(x=>x.id!==state.editId); save('najava_addresses',state.addresses); syncUserData(); state.modal=null; state.editId=null; toast('Adresa je obrisana.'); render(); };
   const form=document.getElementById('addressForm');
   if(form) form.onsubmit=(e)=>{ e.preventDefault(); const fd=new FormData(form); const data={ id: state.editId || crypto.randomUUID(), label:String(fd.get('label')).trim(), street:String(fd.get('street')).trim(), number:String(fd.get('number')).trim(), municipality:String(fd.get('municipality')), electricity: fd.get('electricity')==='on', water: fd.get('water')==='on' }; if(!data.electricity && !data.water) return toast('Izaberi bar jednu uslugu.'); if(state.editId) state.addresses=state.addresses.map(x=>x.id===data.id?data:x); else state.addresses.push(data); save('najava_addresses',state.addresses); syncUserData(); state.modal=null; state.editId=null; toast('Adresa je sačuvana.'); render(); };
