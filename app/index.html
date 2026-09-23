@@ -1437,6 +1437,27 @@ svg{stroke:currentColor;fill:none;stroke-linecap:round;stroke-linejoin:round}
   .analytics-grid{grid-template-columns:1fr}
   .analytics-stat{min-height:118px}
 }
+
+/* ===== Studio 7 credit ===== */
+.app-credit{
+  padding:2px 20px 22px;
+  text-align:center;
+  color:var(--muted-2);
+  font-size:10.5px;
+  line-height:1.4;
+}
+.app-credit a{
+  color:var(--green-6);
+  font-weight:700;
+  text-decoration:none;
+}
+.app-credit a:hover{text-decoration:underline}
+@media(max-width:860px){
+  .app-credit{
+    padding:4px 16px calc(20px + env(safe-area-inset-bottom));
+    font-size:10px;
+  }
+}
 </style>
 </head>
 <body><script>document.documentElement.classList.toggle('netlify-preview', location.hostname.includes('deploy-preview'));</script>
@@ -1668,6 +1689,7 @@ function layout(){
       ${topbar()}
       ${mobileDrawer()}
       <div class="page">${page()}</div>
+      <div class="app-credit">Napravljeno sa <span aria-hidden="true">❤️</span> u <a href="https://studio7.rs" target="_blank" rel="noopener">Studio 7</a></div>
     </div>
   </div>${modal()}${installOnboarding()}`;
 }
