@@ -1438,9 +1438,20 @@ svg{stroke:currentColor;fill:none;stroke-linecap:round;stroke-linejoin:round}
   .analytics-stat{min-height:118px}
 }
 
-/* ===== Studio 7 credit ===== */
+/* ===== Studio 7 credit / true app footer ===== */
+.content{
+  display:flex!important;
+  flex-direction:column!important;
+  min-height:100dvh!important;
+}
+.page{
+  flex:1 0 auto!important;
+  width:100%!important;
+}
 .app-credit{
-  padding:2px 20px 22px;
+  flex:0 0 auto;
+  margin-top:auto;
+  padding:18px 20px 22px;
   text-align:center;
   color:var(--muted-2);
   font-size:10.5px;
@@ -1453,8 +1464,19 @@ svg{stroke:currentColor;fill:none;stroke-linecap:round;stroke-linejoin:round}
 }
 .app-credit a:hover{text-decoration:underline}
 @media(max-width:860px){
+  .content{
+    display:flex!important;
+    flex-direction:column!important;
+    min-height:100dvh!important;
+    padding-bottom:0!important;
+  }
+  .page{
+    flex:1 0 auto!important;
+    padding-bottom:20px!important;
+  }
   .app-credit{
-    padding:4px 16px calc(20px + env(safe-area-inset-bottom));
+    margin-top:auto!important;
+    padding:16px 16px calc(16px + env(safe-area-inset-bottom))!important;
     font-size:10px;
   }
 }
