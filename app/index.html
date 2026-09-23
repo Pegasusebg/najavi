@@ -2032,7 +2032,7 @@ function analyticsPage(){
   <div class="analytics-grid analytics-grid-core">
     <div class="analytics-stat"><span>Landing · unikatne posete</span><strong>${value(a?.landingUniqueVisitors)}</strong><small>Jedinstveni browseri koji su otvorili najavi.rs u periodu</small></div>
     <div class="analytics-stat"><span>Landing · page views</span><strong>${value(a?.landingPageViews)}</strong><small>Ukupan broj otvaranja landing strane u periodu</small></div>
-    <div class="analytics-stat"><span>Registrovani nalozi</span><strong>${value(a?.registrationsInRange)}</strong><small>${a?(a.activeRegisteredAccounts+' aktivnih u periodu · '+a.totalRegisteredAccounts+' ukupno registrovanih'):'Novi korisnički nalozi u periodu'}</small></div>
+    <div class="analytics-stat"><span>Aktivni registrovani nalozi</span><strong>${value(a?.activeRegisteredAccounts)}</strong><small>${a?(a.registrationsInRange+' novih registracija u periodu · '+a.totalRegisteredAccounts+' ukupno registrovanih'):'Registrovani korisnici koji su otvorili aplikaciju u periodu'}</small></div>
     <div class="analytics-stat"><span>Uključili notifikacije</span><strong>${value(a?.notificationsEnabledInRange)}</strong><small>${a?(a.currentPushUsers+' korisnika trenutno ima aktivan push'):'Jedinstveni korisnici koji su uključili push u periodu'}</small></div>
     <div class="analytics-stat"><span>Instalirali aplikaciju</span><strong>${value(a?.installsInRange)}</strong><small>${a?(a.everInstalledUsers+' korisnika ikada · '+a.deviceInstallations+' uređaja'):'Jedinstveni korisnici koji su instalirali PWA u periodu'}</small></div>
   </div>
