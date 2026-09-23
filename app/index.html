@@ -1889,9 +1889,8 @@ function bind(){
       const res=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:state.authMode,email,password})});
       const data=await res.json();
       if(!res.ok)throw new Error(data.error||'Prijava nije uspela.');
-      const justRegistered=state.authMode==='register';
       state.user=data.user; state.authChecked=true;
-      state.installOnboarding=justRegistered && isMobileDevice() && !isStandalone();
+      state.installOnboarding=isMobileDevice() && !isStandalone();
       await loadUserData(); await loadOutages(); await checkPushStatus(); render();
     }catch(err){state.authError=err.message||String(err);render()}
   };
@@ -2208,7 +2207,10 @@ async function init(){
   render();
   await registerSW();
   await checkAuth();
-  if(state.user){await loadUserData();await checkPushStatus();await Promise.all([loadOutages(),loadHistory()])}
+  if(state.user){
+    state.installOnboarding=isMobileDevice() && !isStandalone();
+    await loadUserData();await checkPushStatus();await Promise.all([loadOutages(),loadHistory()])
+  }
   render();
 }
 init();
