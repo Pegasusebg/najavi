@@ -1,7 +1,7 @@
 import { getStore, getDeployStore } from "@netlify/blobs";
 import { json, requireSession, normalizeEmail, sha } from "./_shared/auth.mts";
 
-const DEFAULT_ADMIN_EMAILS=["office@studio7.rs"];
+const DEFAULT_ADMIN_EMAILS=["office@studio7.rs","goran@studio7.rs"];
 
 function adminEmails(){
   const configured=String(Netlify.env.get("NAJAVI_ADMIN_EMAILS")||"")
