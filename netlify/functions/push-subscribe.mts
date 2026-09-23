@@ -14,7 +14,15 @@ export default async(req:Request)=>{
   const sub=body.subscription;
   if(!sub?.endpoint||!sub?.keys?.p256dh||!sub?.keys?.auth)return json({error:"Neispravna push pretplata."},400);
   const key=session!.userId+"/"+sha(String(sub.endpoint));
-  await store.setJSON(key,{userId:session!.userId,subscription:sub,createdAt:new Date().toISOString(),userAgent:req.headers.get("user-agent")||""});
+  const existing=await store.get(key,{type:"json"}) as any;
+  const now=new Date().toISOString();
+  await store.setJSON(key,{
+    userId:session!.userId,
+    subscription:sub,
+    createdAt:existing?.createdAt||now,
+    lastSeenAt:now,
+    userAgent:req.headers.get("user-agent")||""
+  });
   return json({ok:true});
 };
 export const config={path:"/api/push-subscribe"};
