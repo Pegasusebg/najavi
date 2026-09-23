@@ -1681,7 +1681,7 @@ function installOnboarding(){
   </div></div>`;
 }
 function activationCard(){
-  if(!isMobileDevice() || !state.pushChecked || state.pushEnabled)return '';
+  if(!isStandalone() || !isMobileDevice() || !state.pushChecked || state.pushEnabled)return '';
   if(isIOS()&&!isStandalone()){
     return `<div class="activation-card"><div class="activation-icon">${icon('bell')}</div><div class="activation-copy"><strong>Prvo instaliraj Najavi</strong><span>Na iPhone-u obaveštenja rade kada Najavi otvoriš sa Home Screen-a.</span></div><button class="activation-btn" data-action="show-install-guide">Instaliraj</button></div>`;
   }
@@ -1840,17 +1840,17 @@ function settings(){
       </div>
     </div>
     <div class="stack">
-      <div class="push-box">
+      ${standalone?`<div class="push-box">
         <h4>Push notifikacije</h4>
         <p>${state.pushEnabled?'Uključene su na ovom uređaju.':'Uključi ih da Najavi može da ti javi na vreme.'}</p>
         <div class="push-state ${state.pushEnabled?'on':''}">${state.pushEnabled?'● Push uključen':'○ Push nije uključen'}</div>
         ${state.pushDiagnostic?`<div class="push-diagnostic ${state.pushDiagnosticType||'neutral'}">${escapeHtml(state.pushDiagnostic)}</div>`:''}
         <div class="action-row"><button class="btn-compact primary" data-action="enable-push">${state.pushEnabled?'Ponovo registruj':'Uključi notifikacije'}</button><button class="btn-compact" data-action="test-push">Test</button></div>
-      </div>
-      ${mobileDevice?`<div class="install-box">
+      </div>`:''}
+      ${mobileDevice&&!standalone?`<div class="install-box">
         <h4>Instaliraj Najavi</h4>
         ${installCopy}
-        <div class="action-row">${!standalone&&!ios?`<button class="btn-compact primary" data-action="install-app" ${deferredInstallPrompt?'':'disabled'}>Instaliraj aplikaciju</button>`:''}</div>
+        <div class="action-row">${!ios?`<button class="btn-compact primary" data-action="install-app" ${deferredInstallPrompt?'':'disabled'}>Instaliraj aplikaciju</button>`:''}</div>
       </div>`:''}
     </div>
   </div>`;
@@ -2193,7 +2193,9 @@ function escapeAttr(s=''){return escapeHtml(s)}
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();deferredInstallPrompt=event;state.installPromptReady=true;if(state.authChecked)render()});
 window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;state.installPromptReady=false;state.installOnboarding=false;if(state.user){checkPushStatus().then(render)}else if(state.authChecked)render()});
 async function init(){
-  const resetToken=new URLSearchParams(location.search).get('reset');
+  const params=new URLSearchParams(location.search);
+  const resetToken=params.get('reset');
+  if(params.get('mode')==='register')state.authMode='register';
   if(resetToken){
     state.resetToken=resetToken;
     state.authMode='reset';
