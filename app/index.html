@@ -1228,9 +1228,9 @@ svg{stroke:currentColor;fill:none;stroke-linecap:round;stroke-linejoin:round}
   .hero h1{font-size:28px!important;line-height:1.12!important}
   .hero p{font-size:13px!important;line-height:1.55!important;margin-top:7px!important}
 
-  .mobile-kicker{font-size:10px!important}
-  .mobile-home-head h1{font-size:23px!important}
-  .mobile-home-head p{font-size:12px!important;line-height:1.5!important;max-width:310px!important}
+  .mobile-kicker{font-size:11px!important}
+  .mobile-home-head h1{font-size:25px!important}
+  .mobile-home-head p{font-size:13px!important;line-height:1.5!important;max-width:330px!important}
 
   .mobile-primary-alert{padding:14px!important;grid-template-columns:48px minmax(0,1fr) auto!important;gap:11px!important}
   .mobile-alert-icon{width:48px!important;height:48px!important}
@@ -1242,17 +1242,22 @@ svg{stroke:currentColor;fill:none;stroke-linecap:round;stroke-linejoin:round}
   .mobile-detail-note,.mobile-source-link{font-size:11px!important}
 
   .mobile-safe-card{padding:14px!important}
-  .mobile-safe-card strong{font-size:14px!important}
-  .mobile-safe-card span{font-size:11px!important;line-height:1.45!important}
+  .mobile-safe-card strong{font-size:15px!important}
+  .mobile-safe-card span{font-size:12px!important;line-height:1.45!important}
   .mobile-address-strip{padding:13px!important;grid-template-columns:42px minmax(0,1fr) 36px!important}
   .mobile-address-icon{width:42px!important;height:42px!important}
-  .mobile-address-copy strong{font-size:14px!important}
-  .mobile-address-copy span{font-size:11px!important}
+  .mobile-address-copy strong{font-size:15px!important}
+  .mobile-address-copy span{font-size:12px!important}
   .mobile-address-edit{width:36px!important;height:36px!important}
 
-  .source-strip{padding:12px 13px!important;min-height:52px!important}
-  .source-strip strong{font-size:12px!important}
-  .source-strip .left div div,.source-strip .right{font-size:10.5px!important}
+  .source-strip{padding:14px 14px!important;min-height:64px!important;align-items:center!important}
+  .source-strip .left{align-items:flex-start!important;min-width:0!important;flex:1 1 auto!important}
+  .source-strip .left>svg{margin-top:2px!important;flex:0 0 auto!important}
+  .source-copy{min-width:0!important}
+  .source-strip .source-copy>strong{display:block!important;font-size:13.5px!important;line-height:1.3!important;color:#314b37!important}
+  .source-secondary{margin-top:2px!important;font-size:11.5px!important;line-height:1.35!important;color:var(--muted)!important}
+  .source-health{margin-top:4px!important;font-size:11px!important;line-height:1.2!important;font-weight:750!important;color:#35583e!important}
+  .source-strip .right{font-size:11.5px!important;gap:7px!important;flex:0 0 auto!important;align-self:center!important}
 
   /* Addresses page */
   .card-pad,.aside-card,.settings-card{padding:14px!important}
@@ -1794,7 +1799,7 @@ function addressesAside(){
     ${a ? `<div class="address-row"><div class="home-icon">${icon('home')}</div><div><div class="address-name">${escapeHtml(a.label)}</div><div class="address-sub">${icon('pin','icon sm')}${escapeHtml(a.street)} ${escapeHtml(a.number)}, ${escapeHtml(a.municipality)}</div><div class="chips">${a.electricity?`<span class="chip electric">${icon('bolt','icon xs')}Struja</span>`:''}${a.water?`<span class="chip water">${icon('water','icon xs')}Voda</span>`:''}</div></div><button class="icon-btn" data-edit="${a.id}">${icon('dots')}</button></div>` : `<div class="empty"><strong>Nema adresa</strong><div>Dodaj prvu lokaciju.</div></div>`}
   </div>`;
 }
-function sourceStrip(){return `<div class="source-strip"><div class="left">${icon('info')}<div><div style="font-size:13px;color:var(--muted)">Zvanični izvori</div><strong>${sourceStatus()}</strong></div></div><div class="right"><span class="status-dot"></span><span>${state.lastChecked||'—'}</span></div></div>`}
+function sourceStrip(){return `<div class="source-strip"><div class="left">${icon('info')}<div class="source-copy"><strong>Elektrodistribucija Srbije</strong><div class="source-secondary">Grad Beograd · Vodovod i kanalizacija</div><div class="source-health">${sourceStatus()}</div></div></div><div class="right"><span class="status-dot"></span><span>${state.lastChecked||'—'}</span></div></div>`}
 function addresses(){
   return `<section class="hero"><div class="eyebrow">Adrese</div><h1>Moje lokacije</h1><p>Dodaj i uređuj adrese za koje želiš upozorenja.</p></section>
   <div class="card card-pad"><div class="card-head"><div><h3>${state.addresses.length}/${CONFIG.maxAddresses} adrese</h3><p>Prati dom, posao ili roditelje.</p></div>${state.addresses.length<CONFIG.maxAddresses?`<button class="btn-primary" data-action="add-address">Dodaj adresu</button>`:''}</div>
