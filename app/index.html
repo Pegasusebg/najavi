@@ -340,6 +340,18 @@ svg{stroke:currentColor;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .auth-back{display:inline-flex;margin-top:14px;border:0;background:transparent;padding:0;color:#607164;font-size:10px;font-weight:600;cursor:pointer}
 .auth-back:hover{color:var(--green-6)}
 .auth-foot{margin-top:13px;color:var(--muted);font-size:9px;line-height:1.5}
+.activation-card{display:grid;grid-template-columns:42px 1fr auto;gap:12px;align-items:center;padding:15px;border-radius:18px;background:linear-gradient(135deg,#dff3e4,#fbfdfb);border:1px solid #bcdcc3;box-shadow:var(--shadow-xs);margin-bottom:12px}
+.activation-icon{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:#fff;border:1px solid #cbe2d0;color:var(--green-6)}
+.activation-copy strong{display:block;font-size:12px}.activation-copy span{display:block;margin-top:3px;color:#617365;font-size:10px;line-height:1.45}
+.activation-btn{border:1px solid #3b8a52;background:linear-gradient(135deg,var(--green-4),var(--green-6));color:#fff;padding:10px 12px;border-radius:12px;font-size:10px;font-weight:700;white-space:nowrap}
+.install-onboarding-backdrop{position:fixed;inset:0;z-index:120;background:rgba(19,33,23,.46);backdrop-filter:blur(7px);display:grid;place-items:center;padding:18px}
+.install-onboarding-card{width:min(520px,100%);max-height:88dvh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:24px;padding:22px;box-shadow:0 24px 70px rgba(21,45,28,.24)}
+.install-onboarding-head{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;margin-bottom:18px}
+.install-onboarding-head h3{margin:0;font-size:20px;letter-spacing:-.035em}.install-onboarding-head p{margin:5px 0 0;color:var(--muted);font-size:11px;line-height:1.5}
+.install-close{width:34px;height:34px;border-radius:11px;border:1px solid var(--line);background:#fff;display:grid;place-items:center;color:#637466}
+.install-guide{display:grid;gap:10px}.install-guide-card{border:1px solid var(--line);background:#fafdfa;border-radius:16px;padding:14px}
+.install-guide-card h4{margin:0 0 8px;font-size:12px}.install-guide-card ol{margin:0;padding-left:19px;color:#596b5c;font-size:10px;line-height:1.8}
+.install-onboarding-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.install-onboarding-actions .btn-primary,.install-onboarding-actions .btn-secondary{flex:1;justify-content:center;min-width:140px}
 .loading-screen{min-height:100vh;display:grid;place-items:center;color:var(--muted);font-size:13px}
 .spinner{width:34px;height:34px;border:3px solid #dcebdd;border-top-color:var(--green-5);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 10px}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -1389,7 +1401,9 @@ const state = {
   profileOpen:false,
   expandedEventId:null,
   pushEnabled:false,
+  pushChecked:false,
   installPromptReady:false,
+  installOnboarding:false,
   history:[],
   historyLoading:false,
   pushDiagnostic:'',
@@ -1571,7 +1585,7 @@ function layout(){
       ${mobileDrawer()}
       <div class="page">${page()}</div>
     </div>
-  </div>${modal()}`;
+  </div>${modal()}${installOnboarding()}`;
 }
 function sidebar(){
   return `<aside class="sidebar">
@@ -1632,6 +1646,47 @@ function page(){
   if(state.tab==='announcements') return announcements();
   return settings();
 }
+function isStandalone(){
+  return window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone===true;
+}
+function isIOS(){ return /iphone|ipad|ipod/i.test(navigator.userAgent); }
+function isMobileDevice(){
+  return /android|iphone|ipad|ipod/i.test(navigator.userAgent) || window.matchMedia?.('(max-width: 860px)').matches;
+}
+function iosInstallGuide(){
+  return \`<div class="install-guide">
+    <div class="install-guide-card"><h4>Safari</h4><ol>
+      <li>Otvori Najavi u Safari-ju.</li>
+      <li>Tapni <strong>Share</strong> — kvadrat sa strelicom nagore.</li>
+      <li>Izaberi <strong>Add to Home Screen / Dodaj na početni ekran</strong>.</li>
+      <li>Tapni <strong>Add / Dodaj</strong>.</li>
+      <li>Otvori Najavi sa nove ikonice.</li>
+    </ol></div>
+    <div class="install-guide-card"><h4>Chrome na iPhone-u</h4><ol>
+      <li>Otvori Najavi u Chrome-u.</li>
+      <li>Tapni <strong>Share</strong>; ako ga ne vidiš, otvori meni <strong>⋯</strong> pa Share.</li>
+      <li>Izaberi <strong>Add to Home Screen / Dodaj na početni ekran</strong>.</li>
+      <li>Tapni <strong>Add / Dodaj</strong>.</li>
+      <li>Otvori Najavi sa nove ikonice.</li>
+    </ol></div>
+  </div>\`;
+}
+function installOnboarding(){
+  if(!state.installOnboarding || !isMobileDevice() || isStandalone())return '';
+  const ios=isIOS();
+  return \`<div class="install-onboarding-backdrop"><div class="install-onboarding-card">
+    <div class="install-onboarding-head"><div><h3>Instaliraj Najavi</h3><p>Tako je Najavi na telefonu kao aplikacija i spreman da te obavesti.</p></div><button class="install-close" data-action="dismiss-install-onboarding" aria-label="Zatvori">\${icon('close')}</button></div>
+    \${ios?iosInstallGuide():\`<div class="install-guide-card"><h4>Android / Chrome</h4><ol><li>Tapni <strong>Instaliraj aplikaciju</strong>.</li><li>Ako dugme nije dostupno: Chrome meni <strong>⋮</strong> → <strong>Install app / Add to Home screen</strong>.</li><li>Otvori Najavi sa nove ikonice.</li></ol></div>\`}
+    <div class="install-onboarding-actions">\${!ios?\`<button class="btn-primary" data-action="install-app" \${deferredInstallPrompt?'':'disabled'}>Instaliraj aplikaciju</button>\`:''}<button class="btn-secondary" data-action="dismiss-install-onboarding">Kasnije</button></div>
+  </div></div>\`;
+}
+function activationCard(){
+  if(!isMobileDevice() || !state.pushChecked || state.pushEnabled)return '';
+  if(isIOS()&&!isStandalone()){
+    return \`<div class="activation-card"><div class="activation-icon">\${icon('bell')}</div><div class="activation-copy"><strong>Prvo instaliraj Najavi</strong><span>Na iPhone-u obaveštenja rade kada Najavi otvoriš sa Home Screen-a.</span></div><button class="activation-btn" data-action="show-install-guide">Instaliraj</button></div>\`;
+  }
+  return \`<div class="activation-card"><div class="activation-icon">\${icon('bell')}</div><div class="activation-copy"><strong>Uključi obaveštenja</strong><span>Da Najavi može da ti javi na vreme.</span></div><button class="activation-btn" data-action="enable-push">Uključi</button></div>\`;
+}
 function home(){
   const ms=matches();
   const m=ms[0];
@@ -1650,6 +1705,7 @@ function home(){
       </div>
       <button class="mobile-refresh" data-action="refresh">${icon('refresh')}</button>
     </div>
+    ${activationCard()}
     ${m ? mobileAlertCard(m) : mobileSafeCard()}
     ${a ? mobileAddressStrip(a) : mobileAddAddress()}
     ${sourceStrip()}
