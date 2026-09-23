@@ -12,7 +12,7 @@ function offsetFor(date:string){const d=new Date(date+"T12:00:00Z");const z=new 
 function eventDate(e:any){return new Date(`${e.date}T${e.start}:00${offsetFor(e.date)}`)}
 function localParts(d=new Date()){const p=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Belgrade",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",hourCycle:"h23"}).formatToParts(d);const g=(t:string)=>p.find(x=>x.type===t)?.value||"";return {date:`${g("year")}-${g("month")}-${g("day")}`,hour:Number(g("hour"))}}
 function kindFor(e:any,prefs:any,now=new Date()){const diff=(eventDate(e).getTime()-now.getTime())/3600000;const lp=localParts(now);if(prefs.twoHours&&diff>=1.5&&diff<2.5)return"twoHours";if(prefs.dayBefore&&diff>=23.5&&diff<24.5)return"dayBefore";if(prefs.morning&&e.date===lp.date&&lp.hour>=7&&lp.hour<9&&diff>0)return"morning";return null}
-function copy(kind:string,e:any,a:any){const utility=e.utility==="electricity"?"struje":"vode";const prefix=kind==="dayBefore"?"Sutra":kind==="twoHours"?"Za oko 2 sata":"Danas";return {title:`${prefix}: prekid ${utility} — ${a.label}`,body:`${a.street} ${a.number} · ${e.start}–${e.end}`,url:"/",tag:`najavi-${e.id}-${kind}`}}
+function copy(kind:string,e:any,a:any){const utility=e.utility==="electricity"?"struje":"vode";const prefix=kind==="dayBefore"?"Sutra":kind==="twoHours"?"Za oko 2 sata":"Danas";return {title:`${prefix}: prekid ${utility} — ${a.label}`,body:`${a.street} ${a.number} · ${e.start}–${e.end}`,url:"/app/",tag:`najavi-${e.id}-${kind}`}}
 export default async()=>{
   const pub=Netlify.env.get("VAPID_PUBLIC_KEY"),priv=Netlify.env.get("VAPID_PRIVATE_KEY"),subject=Netlify.env.get("VAPID_SUBJECT")||"https://najavi.rs";
   if(!pub||!priv)return;
