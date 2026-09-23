@@ -2,6 +2,7 @@ import { getStore, getDeployStore } from "@netlify/blobs";
 import { json, requireSession, normalizeEmail, sha } from "./_shared/auth.mts";
 
 const DEFAULT_ADMIN_EMAILS=["office@studio7.rs","goran@studio7.rs"];
+const TRACKING_STARTED_AT="2026-09-23T19:49:00Z";
 
 function adminEmails(){
   const configured=String(Netlify.env.get("NAJAVI_ADMIN_EMAILS")||"")
@@ -9,6 +10,11 @@ function adminEmails(){
   return new Set([...DEFAULT_ADMIN_EMAILS,...configured]);
 }
 function isAdmin(email:string){ return adminEmails().has(normalizeEmail(email)); }
+function internalEmails(){
+  const configured=String(Netlify.env.get("NAJAVI_INTERNAL_EMAILS")||"")
+    .split(",").map(normalizeEmail).filter(Boolean);
+  return new Set([...adminEmails(),...configured]);
+}
 
 function analyticsStore(){
   const production=Netlify.env.get("CONTEXT")==="production";
@@ -57,9 +63,20 @@ export default async(req:Request)=>{
     if(event==="app_open"){
       const key=`open/${dayKey()}/${session!.userId}/${deviceHash}`;
       const existing=await analytics.get(key,{type:"json"}) as any;
-      await analytics.setJSON(key,{
+      const row={
         userId:session!.userId,
         firstOpenedAt:existing?.firstOpenedAt||now,
+        lastOpenedAt:now,
+        installed:Boolean(body.installed),
+        userAgent:ua.slice(0,300)
+      };
+      await analytics.setJSON(key,row);
+
+      const activityKey=`activity/${session!.userId}/${deviceHash}`;
+      const activity=await analytics.get(activityKey,{type:"json"}) as any;
+      await analytics.setJSON(activityKey,{
+        userId:session!.userId,
+        firstOpenedAt:activity?.firstOpenedAt||row.firstOpenedAt,
         lastOpenedAt:now,
         installed:Boolean(body.installed),
         userAgent:ua.slice(0,300)
@@ -75,50 +92,106 @@ export default async(req:Request)=>{
 
   const auth=getStore("najava-auth",{consistency:"strong"});
   const push=getStore("najava-push",{consistency:"strong"});
-  const [userList,installList,pushList,openList]=await Promise.all([
+  const [userList,installList,pushList,activityList,openList]=await Promise.all([
     auth.list({prefix:"user/"}),
     analytics.list({prefix:"install/"}),
     push.list(),
+    analytics.list({prefix:"activity/"}),
     analytics.list({prefix:"open/"})
   ]);
 
-  const users=await Promise.all(userList.blobs.map(b=>auth.get(b.key,{type:"json"}) as Promise<any>));
-  const installs=await Promise.all(installList.blobs.map(b=>analytics.get(b.key,{type:"json"}) as Promise<any>));
+  const [users,installs,pushRows,activities,openRows]=await Promise.all([
+    Promise.all(userList.blobs.map(b=>auth.get(b.key,{type:"json"}) as Promise<any>)),
+    Promise.all(installList.blobs.map(b=>analytics.get(b.key,{type:"json"}) as Promise<any>)),
+    Promise.all(pushList.blobs.map(b=>push.get(b.key,{type:"json"}) as Promise<any>)),
+    Promise.all(activityList.blobs.map(b=>analytics.get(b.key,{type:"json"}) as Promise<any>)),
+    Promise.all(openList.blobs.map(b=>analytics.get(b.key,{type:"json"}) as Promise<any>))
+  ]);
 
+  const internal=internalEmails();
+  const validUsers=users.filter(u=>u?.id&&u?.email);
+  const internalUsers=validUsers.filter(u=>internal.has(normalizeEmail(u.email)));
+  const customerUsers=validUsers.filter(u=>!internal.has(normalizeEmail(u.email)));
+  const customerIds=new Set(customerUsers.map(u=>String(u.id)));
+
+  const cutoff1=daysAgo(1);
   const cutoff7=daysAgo(7);
-  const totalAccounts=users.filter(Boolean).length;
-  const accounts7d=users.filter(u=>u?.createdAt&&new Date(u.createdAt).getTime()>=cutoff7).length;
+  const cutoff30=daysAgo(30);
 
-  const installedUserIds=new Set(
-    installList.blobs
-      .map(b=>String(b.key).split("/")[1]||"")
-      .filter(Boolean)
-  );
-  const installs7d=installs.filter(i=>i?.firstInstalledAt&&new Date(i.firstInstalledAt).getTime()>=cutoff7);
-  const installedUsers7d=new Set(installs7d.map(i=>String(i.userId||"")).filter(Boolean)).size;
+  const customerAccounts=customerUsers.length;
+  const accounts7d=customerUsers.filter(u=>u?.createdAt&&new Date(u.createdAt).getTime()>=cutoff7).length;
 
-  const pushUserIds=new Set(pushList.blobs.map(b=>String(b.key).split("/")[0]).filter(Boolean));
+  const installRows=installs.map((row,i)=>{
+    const keyUserId=String(installList.blobs[i]?.key||"").split("/")[1]||"";
+    return {...(row||{}),userId:String(row?.userId||keyUserId)};
+  }).filter(row=>customerIds.has(row.userId));
 
-  const activeUserIds7d=new Set<string>();
-  for(const blob of openList.blobs){
-    const parts=String(blob.key).split("/");
-    if(parts.length<4)continue;
-    const date=Date.parse(parts[1]+"T00:00:00Z");
-    if(Number.isFinite(date)&&date>=cutoff7)activeUserIds7d.add(parts[2]);
-  }
+  const everInstalledUserIds=new Set(installRows.map(row=>row.userId));
+  const installs7d=installRows.filter(row=>row?.firstInstalledAt&&new Date(row.firstInstalledAt).getTime()>=cutoff7);
+  const installedUsers7d=new Set(installs7d.map(row=>row.userId)).size;
+  const activeInstallRows30d=installRows.filter(row=>row?.lastSeenAt&&new Date(row.lastSeenAt).getTime()>=cutoff30);
+  const activeInstallUsers30d=new Set(activeInstallRows30d.map(row=>row.userId));
 
-  const conversion=totalAccounts?Math.round((installedUserIds.size/totalAccounts)*1000)/10:0;
+  const customerPushRows=pushRows.map((row,i)=>{
+    const keyUserId=String(pushList.blobs[i]?.key||"").split("/")[0]||"";
+    return {...(row||{}),userId:String(row?.userId||keyUserId)};
+  }).filter(row=>customerIds.has(row.userId));
+  const pushUserIds=new Set(customerPushRows.map(row=>row.userId));
+
+  // Merge compact activity summaries with historical daily-open rows so the
+  // dashboard remains correct across the analytics upgrade.
+  const activityByDevice=new Map<string,{userId:string,lastOpenedAt:string,installed:boolean}>();
+  const absorb=(row:any,keyFallback="")=>{
+    const userId=String(row?.userId||keyFallback);
+    const lastOpenedAt=String(row?.lastOpenedAt||row?.firstOpenedAt||"");
+    if(!customerIds.has(userId)||!lastOpenedAt)return;
+    const deviceKey=String(row?.deviceHash||"");
+    const key=deviceKey?`${userId}/${deviceKey}`:`${userId}/${sha(String(row?.userAgent||"")+"|"+lastOpenedAt.slice(0,10))}`;
+    const prev=activityByDevice.get(key);
+    if(!prev||new Date(lastOpenedAt).getTime()>new Date(prev.lastOpenedAt).getTime()){
+      activityByDevice.set(key,{userId,lastOpenedAt,installed:Boolean(row?.installed)});
+    }
+  };
+  activities.forEach((row,i)=>{
+    const parts=String(activityList.blobs[i]?.key||"").split("/");
+    absorb({...row,deviceHash:parts[2]||""},parts[1]||"");
+  });
+  openRows.forEach((row,i)=>{
+    const parts=String(openList.blobs[i]?.key||"").split("/");
+    absorb({...row,deviceHash:parts[3]||""},parts[2]||"");
+  });
+
+  const activeUsersSince=(cutoff:number)=>{
+    const ids=new Set<string>();
+    for(const row of activityByDevice.values()){
+      if(new Date(row.lastOpenedAt).getTime()>=cutoff)ids.add(row.userId);
+    }
+    return ids.size;
+  };
+
+  const activeUsers1d=activeUsersSince(cutoff1);
+  const activeUsers7d=activeUsersSince(cutoff7);
+  const activeUsers30d=activeUsersSince(cutoff30);
+  const conversion=customerAccounts?Math.round((everInstalledUserIds.size/customerAccounts)*1000)/10:0;
 
   return json({
     generatedAt:new Date().toISOString(),
-    totalAccounts,
+    trackingStartedAt:TRACKING_STARTED_AT,
+    customerAccounts,
+    totalAccounts:customerAccounts,
     accounts7d,
-    installedUsers:installedUserIds.size,
+    internalAccounts:internalUsers.length,
+    everInstalledUsers:everInstalledUserIds.size,
+    installedUsers:everInstalledUserIds.size,
     installedUsers7d,
-    deviceInstallations:installList.blobs.length,
+    deviceInstallations:installRows.length,
+    activeInstallUsers30d:activeInstallUsers30d.size,
+    activeInstallDevices30d:activeInstallRows30d.length,
     pushUsers:pushUserIds.size,
-    pushDevices:pushList.blobs.length,
-    activeUsers7d:activeUserIds7d.size,
+    pushDevices:customerPushRows.length,
+    activeUsers1d,
+    activeUsers7d,
+    activeUsers30d,
     accountToInstallConversion:conversion
   });
 };
