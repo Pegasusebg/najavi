@@ -1654,7 +1654,7 @@ function isMobileDevice(){
   return /android|iphone|ipad|ipod/i.test(navigator.userAgent) || window.matchMedia?.('(max-width: 860px)').matches;
 }
 function iosInstallGuide(){
-  return \`<div class="install-guide">
+  return `<div class="install-guide">
     <div class="install-guide-card"><h4>Safari</h4><ol>
       <li>Otvori Najavi u Safari-ju.</li>
       <li>Tapni <strong>Share</strong> — kvadrat sa strelicom nagore.</li>
@@ -1669,23 +1669,23 @@ function iosInstallGuide(){
       <li>Tapni <strong>Add / Dodaj</strong>.</li>
       <li>Otvori Najavi sa nove ikonice.</li>
     </ol></div>
-  </div>\`;
+  </div>`;
 }
 function installOnboarding(){
   if(!state.installOnboarding || !isMobileDevice() || isStandalone())return '';
   const ios=isIOS();
-  return \`<div class="install-onboarding-backdrop"><div class="install-onboarding-card">
-    <div class="install-onboarding-head"><div><h3>Instaliraj Najavi</h3><p>Tako je Najavi na telefonu kao aplikacija i spreman da te obavesti.</p></div><button class="install-close" data-action="dismiss-install-onboarding" aria-label="Zatvori">\${icon('close')}</button></div>
-    \${ios?iosInstallGuide():\`<div class="install-guide-card"><h4>Android / Chrome</h4><ol><li>Tapni <strong>Instaliraj aplikaciju</strong>.</li><li>Ako dugme nije dostupno: Chrome meni <strong>⋮</strong> → <strong>Install app / Add to Home screen</strong>.</li><li>Otvori Najavi sa nove ikonice.</li></ol></div>\`}
-    <div class="install-onboarding-actions">\${!ios?\`<button class="btn-primary" data-action="install-app" \${deferredInstallPrompt?'':'disabled'}>Instaliraj aplikaciju</button>\`:''}<button class="btn-secondary" data-action="dismiss-install-onboarding">Kasnije</button></div>
-  </div></div>\`;
+  return `<div class="install-onboarding-backdrop"><div class="install-onboarding-card">
+    <div class="install-onboarding-head"><div><h3>Instaliraj Najavi</h3><p>Tako je Najavi na telefonu kao aplikacija i spreman da te obavesti.</p></div><button class="install-close" data-action="dismiss-install-onboarding" aria-label="Zatvori">${icon('close')}</button></div>
+    ${ios?iosInstallGuide():`<div class="install-guide-card"><h4>Android / Chrome</h4><ol><li>Tapni <strong>Instaliraj aplikaciju</strong>.</li><li>Ako dugme nije dostupno: Chrome meni <strong>⋮</strong> → <strong>Install app / Add to Home screen</strong>.</li><li>Otvori Najavi sa nove ikonice.</li></ol></div>`}
+    <div class="install-onboarding-actions">${!ios?`<button class="btn-primary" data-action="install-app" ${deferredInstallPrompt?'':'disabled'}>Instaliraj aplikaciju</button>`:''}<button class="btn-secondary" data-action="dismiss-install-onboarding">Kasnije</button></div>
+  </div></div>`;
 }
 function activationCard(){
   if(!isMobileDevice() || !state.pushChecked || state.pushEnabled)return '';
   if(isIOS()&&!isStandalone()){
-    return \`<div class="activation-card"><div class="activation-icon">\${icon('bell')}</div><div class="activation-copy"><strong>Prvo instaliraj Najavi</strong><span>Na iPhone-u obaveštenja rade kada Najavi otvoriš sa Home Screen-a.</span></div><button class="activation-btn" data-action="show-install-guide">Instaliraj</button></div>\`;
+    return `<div class="activation-card"><div class="activation-icon">${icon('bell')}</div><div class="activation-copy"><strong>Prvo instaliraj Najavi</strong><span>Na iPhone-u obaveštenja rade kada Najavi otvoriš sa Home Screen-a.</span></div><button class="activation-btn" data-action="show-install-guide">Instaliraj</button></div>`;
   }
-  return \`<div class="activation-card"><div class="activation-icon">\${icon('bell')}</div><div class="activation-copy"><strong>Uključi obaveštenja</strong><span>Da Najavi može da ti javi na vreme.</span></div><button class="activation-btn" data-action="enable-push">Uključi</button></div>\`;
+  return `<div class="activation-card"><div class="activation-icon">${icon('bell')}</div><div class="activation-copy"><strong>Uključi obaveštenja</strong><span>Da Najavi može da ti javi na vreme.</span></div><button class="activation-btn" data-action="enable-push">Uključi</button></div>`;
 }
 function home(){
   const ms=matches();
@@ -1829,31 +1829,31 @@ function settings(){
     : ios
       ? '<p>Dodaj Najavi na početni ekran, pa je otvori sa ikonice.</p>'+iosInstallGuide()
       : '<p>Chrome → Instaliraj aplikaciju. Ako dugme nije dostupno: meni ⋮ → Install app / Add to Home screen.</p>';
-  return \`<section class="hero"><div class="eyebrow">Podešavanja</div><h1>Obaveštenja</h1><p>Podesi kada želiš da te Najavi upozori.</p></section>
+  return `<section class="hero"><div class="eyebrow">Podešavanja</div><h1>Obaveštenja</h1><p>Podesi kada želiš da te Najavi upozori.</p></section>
   <div class="settings-grid">
     <div class="card settings-card">
       <div class="card-head"><div><h3>Vreme upozorenja</h3><p>Možeš uključiti više opcija.</p></div></div>
       <div class="pref-list">
-        \${prefRow('dayBefore','24 sata ranije','Glavno upozorenje dan pre planiranog prekida.')}
-        \${prefRow('morning','Podsetnik tog jutra','Kratko podsećanje između 07:00 i 09:00 na dan prekida.')}
-        \${prefRow('twoHours','2 sata ranije','Dodatno upozorenje neposredno pre početka.')}
+        ${prefRow('dayBefore','24 sata ranije','Glavno upozorenje dan pre planiranog prekida.')}
+        ${prefRow('morning','Podsetnik tog jutra','Kratko podsećanje između 07:00 i 09:00 na dan prekida.')}
+        ${prefRow('twoHours','2 sata ranije','Dodatno upozorenje neposredno pre početka.')}
       </div>
     </div>
     <div class="stack">
       <div class="push-box">
         <h4>Push notifikacije</h4>
-        <p>\${state.pushEnabled?'Uključene su na ovom uređaju.':'Uključi ih da Najavi može da ti javi na vreme.'}</p>
-        <div class="push-state \${state.pushEnabled?'on':''}">\${state.pushEnabled?'● Push uključen':'○ Push nije uključen'}</div>
-        \${state.pushDiagnostic?\`<div class="push-diagnostic \${state.pushDiagnosticType||'neutral'}">\${escapeHtml(state.pushDiagnostic)}</div>\`:''}
-        <div class="action-row"><button class="btn-compact primary" data-action="enable-push">\${state.pushEnabled?'Ponovo registruj':'Uključi notifikacije'}</button><button class="btn-compact" data-action="test-push">Test</button></div>
+        <p>${state.pushEnabled?'Uključene su na ovom uređaju.':'Uključi ih da Najavi može da ti javi na vreme.'}</p>
+        <div class="push-state ${state.pushEnabled?'on':''}">${state.pushEnabled?'● Push uključen':'○ Push nije uključen'}</div>
+        ${state.pushDiagnostic?`<div class="push-diagnostic ${state.pushDiagnosticType||'neutral'}">${escapeHtml(state.pushDiagnostic)}</div>`:''}
+        <div class="action-row"><button class="btn-compact primary" data-action="enable-push">${state.pushEnabled?'Ponovo registruj':'Uključi notifikacije'}</button><button class="btn-compact" data-action="test-push">Test</button></div>
       </div>
-      \${mobileDevice?\`<div class="install-box">
+      ${mobileDevice?`<div class="install-box">
         <h4>Instaliraj Najavi</h4>
-        \${installCopy}
-        <div class="action-row">\${!standalone&&!ios?\`<button class="btn-compact primary" data-action="install-app" \${deferredInstallPrompt?'':'disabled'}>Instaliraj aplikaciju</button>\`:''}</div>
-      </div>\`:''}
+        ${installCopy}
+        <div class="action-row">${!standalone&&!ios?`<button class="btn-compact primary" data-action="install-app" ${deferredInstallPrompt?'':'disabled'}>Instaliraj aplikaciju</button>`:''}</div>
+      </div>`:''}
     </div>
-  </div>\`;
+  </div>`;
 }
 
 function prefRow(key,title,desc){
