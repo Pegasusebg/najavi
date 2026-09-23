@@ -89,7 +89,11 @@ export default async(req:Request)=>{
   const totalAccounts=users.filter(Boolean).length;
   const accounts7d=users.filter(u=>u?.createdAt&&new Date(u.createdAt).getTime()>=cutoff7).length;
 
-  const installedUserIds=new Set(installs.filter(Boolean).map(i=>String(i.userId||"")).filter(Boolean));
+  const installedUserIds=new Set(
+    installList.blobs
+      .map(b=>String(b.key).split("/")[1]||"")
+      .filter(Boolean)
+  );
   const installs7d=installs.filter(i=>i?.firstInstalledAt&&new Date(i.firstInstalledAt).getTime()>=cutoff7);
   const installedUsers7d=new Set(installs7d.map(i=>String(i.userId||"")).filter(Boolean)).size;
 
