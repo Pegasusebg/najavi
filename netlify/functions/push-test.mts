@@ -5,7 +5,7 @@ import { json, requireSession } from "./_shared/auth.mts";
 export default async(req:Request)=>{
   const {error,session}=await requireSession(req); if(error)return error;
   if(req.method!=="POST")return json({error:"Method not allowed"},405);
-  const pub=Netlify.env.get("VAPID_PUBLIC_KEY"),priv=Netlify.env.get("VAPID_PRIVATE_KEY"),subject=Netlify.env.get("VAPID_SUBJECT")||"https://www.studio7.rs";
+  const pub=Netlify.env.get("VAPID_PUBLIC_KEY"),priv=Netlify.env.get("VAPID_PRIVATE_KEY"),subject=Netlify.env.get("VAPID_SUBJECT")||"https://najavi.rs";
   if(!pub||!priv)return json({error:"Push nije konfigurisan."},503);
   webpush.setVapidDetails(subject,pub,priv);
   const store=getStore("najava-push",{consistency:"strong"});
@@ -17,7 +17,7 @@ export default async(req:Request)=>{
   for(const b of list.blobs){
     const row=await store.get(b.key,{type:"json"}) as any;
     try{
-      await webpush.sendNotification(row.subscription,JSON.stringify({title:"Najavi je spreman",body:"Push obaveštenja rade na ovom uređaju.",url:"/",tag:"najavi-test"}));
+      await webpush.sendNotification(row.subscription,JSON.stringify({title:"Najavi je spreman",body:"Push obaveštenja rade na ovom uređaju.",url:"/app/",tag:"najavi-test"}));
       sent++;
     }catch(e:any){
       errors.push({statusCode:e?.statusCode||null,message:e?.message||String(e),body:e?.body||null});
