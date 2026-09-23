@@ -3,7 +3,7 @@ import { json, requireSession, normalizeEmail, sha } from "./_shared/auth.mts";
 
 const DEFAULT_ADMIN_EMAILS=["office@studio7.rs","goran@studio7.rs"];
 const TRACKING_STARTED_AT="2026-09-23T19:49:00Z";
-const LANDING_TRACKING_STARTED_AT="2026-09-23T21:10:00Z";
+const LANDING_TRACKING_STARTED_AT="2026-09-23T21:13:17Z";
 
 function adminEmails(){
   const configured=String(Netlify.env.get("NAJAVI_ADMIN_EMAILS")||"")
@@ -171,50 +171,62 @@ export default async(req:Request)=>{
     analytics.list({prefix:"landing-view/"})
   ]);
 
-  const [users,installs,pushEnabledRows]=await Promise.all([
+  const [users,installs,pushRows,pushEnabledRows]=await Promise.all([
     Promise.all(userList.blobs.map(b=>auth.get(b.key,{type:"json"}) as Promise<any>)),
     Promise.all(installList.blobs.map(b=>analytics.get(b.key,{type:"json"}) as Promise<any>)),
+    Promise.all(pushList.blobs.map(b=>push.get(b.key,{type:"json"}) as Promise<any>)),
     Promise.all(pushEnabledList.blobs.map(b=>analytics.get(b.key,{type:"json"}) as Promise<any>))
   ]);
 
   const internal=internalEmails();
   const validUsers=users.filter(u=>u?.id&&u?.email);
+  const internalUsers=validUsers.filter(u=>internal.has(normalizeEmail(u.email)));
   const customerUsers=validUsers.filter(u=>!internal.has(normalizeEmail(u.email)));
+  const validIds=new Set(validUsers.map(u=>String(u.id)));
   const customerIds=new Set(customerUsers.map(u=>String(u.id)));
+  const internalIds=new Set(internalUsers.map(u=>String(u.id)));
 
-  const totalRegisteredAccounts=customerUsers.length;
-  const registrationsInRange=customerUsers.filter(u=>inRangeIso(u?.createdAt,range)).length;
-
-  const activeAccountIds=new Set<string>();
-  for(const blob of openList.blobs){
-    const parts=String(blob.key).split("/");
-    if(parts.length<4)continue;
-    const day=parts[1],userId=parts[2];
-    if(customerIds.has(userId)&&inRangeDay(day,range))activeAccountIds.add(userId);
-  }
+  // "Aktivni nalog" here means an existing, non-deleted account in auth.
+  // Range controls the "new in period" submetric, not whether the account still exists.
+  const totalRegisteredAccounts=validUsers.length;
+  const totalCustomerAccounts=customerUsers.length;
+  const totalInternalAccounts=internalUsers.length;
+  const registrationsInRange=validUsers.filter(u=>inRangeIso(u?.createdAt,range)).length;
+  const customerRegistrationsInRange=customerUsers.filter(u=>inRangeIso(u?.createdAt,range)).length;
 
   const installRows=installs.map((row,i)=>{
     const keyUserId=String(installList.blobs[i]?.key||"").split("/")[1]||"";
     return {...(row||{}),userId:String(row?.userId||keyUserId)};
-  }).filter(row=>customerIds.has(row.userId));
-  const installedUserIdsAll=new Set(installRows.map(row=>row.userId));
+  }).filter(row=>validIds.has(row.userId));
+  const installedIdsAll=new Set(installRows.map(row=>row.userId));
+  const installedCustomerIdsAll=new Set(installRows.filter(row=>customerIds.has(row.userId)).map(row=>row.userId));
+  const installedInternalIdsAll=new Set(installRows.filter(row=>internalIds.has(row.userId)).map(row=>row.userId));
   const installedInRange=new Set(
     installRows.filter(row=>inRangeIso(row?.firstInstalledAt,range)).map(row=>row.userId)
+  );
+
+  const normalizedPushRows=pushRows.map((row,i)=>{
+    const keyUserId=String(pushList.blobs[i]?.key||"").split("/")[0]||"";
+    return {...(row||{}),userId:String(row?.userId||keyUserId)};
+  }).filter(row=>validIds.has(row.userId));
+  const currentPushIds=new Set(normalizedPushRows.map(row=>row.userId));
+  const currentPushCustomerIds=new Set(normalizedPushRows.filter(row=>customerIds.has(row.userId)).map(row=>row.userId));
+  const currentPushInternalIds=new Set(normalizedPushRows.filter(row=>internalIds.has(row.userId)).map(row=>row.userId));
+  const pushEnabledFromStoreInRange=new Set(
+    normalizedPushRows.filter(row=>inRangeIso(row?.createdAt,range)).map(row=>row.userId)
   );
 
   const pushEnabledRowsNormalized=pushEnabledRows.map((row,i)=>{
     const keyUserId=String(pushEnabledList.blobs[i]?.key||"").split("/")[1]||"";
     return {...(row||{}),userId:String(row?.userId||keyUserId)};
-  }).filter(row=>customerIds.has(row.userId));
-  const notificationsEnabledInRange=new Set(
+  }).filter(row=>validIds.has(row.userId));
+  const pushEnabledFromEventsInRange=new Set(
     pushEnabledRowsNormalized.filter(row=>inRangeIso(row?.firstEnabledAt,range)).map(row=>row.userId)
   );
-
-  const currentPushUserIds=new Set(
-    pushList.blobs
-      .map(b=>String(b.key).split("/")[0]||"")
-      .filter(id=>customerIds.has(id))
-  );
+  const notificationsEnabledInRange=new Set([
+    ...pushEnabledFromStoreInRange,
+    ...pushEnabledFromEventsInRange
+  ]);
 
   const landingUniqueSet=new Set<string>();
   for(const blob of landingVisitorList.blobs){
@@ -236,12 +248,19 @@ export default async(req:Request)=>{
     landingUniqueVisitors:landingUniqueSet.size,
     landingPageViews,
     registrationsInRange,
-    activeRegisteredAccounts:activeAccountIds.size,
+    customerRegistrationsInRange,
+    activeRegisteredAccounts:totalRegisteredAccounts,
     totalRegisteredAccounts,
+    totalCustomerAccounts,
+    totalInternalAccounts,
     notificationsEnabledInRange:notificationsEnabledInRange.size,
-    currentPushUsers:currentPushUserIds.size,
+    currentPushUsers:currentPushIds.size,
+    currentPushCustomerUsers:currentPushCustomerIds.size,
+    currentPushInternalUsers:currentPushInternalIds.size,
     installsInRange:installedInRange.size,
-    everInstalledUsers:installedUserIdsAll.size,
+    everInstalledUsers:installedIdsAll.size,
+    everInstalledCustomerUsers:installedCustomerIdsAll.size,
+    everInstalledInternalUsers:installedInternalIdsAll.size,
     deviceInstallations:installRows.length
   });
 };
