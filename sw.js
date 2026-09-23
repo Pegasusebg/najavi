@@ -1,7 +1,10 @@
-const CACHE="najavi-v3";
+const CACHE="najavi-v4";
 const STATIC=["/","/app/","/manifest.webmanifest","/najava-icon.svg"];
 self.addEventListener("install",event=>{event.waitUntil(caches.open(CACHE).then(c=>c.addAll(STATIC)).catch(()=>{}));self.skipWaiting()});
-self.addEventListener("activate",event=>{event.waitUntil(self.clients.claim())});
+self.addEventListener("activate",event=>{event.waitUntil(Promise.all([
+  caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))),
+  self.clients.claim()
+]))});
 self.addEventListener("fetch",event=>{
   if(event.request.method!=="GET"||new URL(event.request.url).origin!==self.location.origin)return;
   event.respondWith(fetch(event.request).then(res=>{const copy=res.clone();caches.open(CACHE).then(c=>c.put(event.request,copy)).catch(()=>{});return res}).catch(()=>caches.match(event.request).then(r=>r||caches.match(new URL(event.request.url).pathname.startsWith("/app")?"/app/":"/"))));

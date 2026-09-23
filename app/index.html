@@ -2032,11 +2032,11 @@ function analyticsPage(){
   <div class="analytics-grid analytics-grid-core">
     <div class="analytics-stat"><span>Landing · unikatne posete</span><strong>${value(a?.landingUniqueVisitors)}</strong><small>Jedinstveni browseri koji su otvorili najavi.rs u periodu</small></div>
     <div class="analytics-stat"><span>Landing · page views</span><strong>${value(a?.landingPageViews)}</strong><small>Ukupan broj otvaranja landing strane u periodu</small></div>
-    <div class="analytics-stat"><span>Aktivni registrovani nalozi</span><strong>${value(a?.activeRegisteredAccounts)}</strong><small>${a?(a.registrationsInRange+' novih registracija u periodu · '+a.totalRegisteredAccounts+' ukupno registrovanih'):'Registrovani korisnici koji su otvorili aplikaciju u periodu'}</small></div>
-    <div class="analytics-stat"><span>Uključili notifikacije</span><strong>${value(a?.notificationsEnabledInRange)}</strong><small>${a?(a.currentPushUsers+' korisnika trenutno ima aktivan push'):'Jedinstveni korisnici koji su uključili push u periodu'}</small></div>
-    <div class="analytics-stat"><span>Instalirali aplikaciju</span><strong>${value(a?.installsInRange)}</strong><small>${a?(a.everInstalledUsers+' korisnika ikada · '+a.deviceInstallations+' uređaja'):'Jedinstveni korisnici koji su instalirali PWA u periodu'}</small></div>
+    <div class="analytics-stat"><span>Aktivni registrovani nalozi</span><strong>${value(a?.activeRegisteredAccounts)}</strong><small>${a?(a.registrationsInRange+' novih u periodu · '+a.totalCustomerAccounts+' korisnička + '+a.totalInternalAccounts+' interna/admin'):'Svi postojeći nalozi koji nisu obrisani'}</small></div>
+    <div class="analytics-stat"><span>Notifikacije uključene</span><strong>${value(a?.currentPushUsers)}</strong><small>${a?(a.notificationsEnabledInRange+' uključilo u periodu · '+a.currentPushCustomerUsers+' korisnička + '+a.currentPushInternalUsers+' interna/admin'):'Nalozi koji trenutno imaju aktivnu push pretplatu'}</small></div>
+    <div class="analytics-stat"><span>Instalirali aplikaciju</span><strong>${value(a?.everInstalledUsers)}</strong><small>${a?(a.installsInRange+' novih instalacija u periodu · '+a.everInstalledCustomerUsers+' korisnička + '+a.everInstalledInternalUsers+' interna/admin · '+a.deviceInstallations+' uređaja'):'Nalozi kod kojih je detektovana instalirana PWA'}</small></div>
   </div>
-  <div class="analytics-note"><strong>Napomena:</strong> admin/interni nalozi se ne računaju. Landing posete se anonimno mere od 23.09.2026. Instalacije i uključivanje notifikacija starijih korisnika dopunjavaju se kada ponovo otvore aplikaciju.</div>`;
+  <div class="analytics-note"><strong>Važno:</strong> landing merenje je uključeno 23.09.2026. oko 23:13 i ne može retroaktivno da prikaže posete pre tog trenutka. Zato izbor „30 dana“ za landing trenutno znači samo dostupne podatke od početka merenja. Nalozi se čitaju direktno iz auth baze, pa prikaz uključuje i korisničke i interne/admin naloge uz jasnu podelu.</div>`;
 }
 function analyticsToday(){
   const d=new Date();
