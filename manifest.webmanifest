@@ -2,7 +2,7 @@
   "name": "Najavi",
   "short_name": "Najavi",
   "description": "Upozorenja za planirane prekide struje i vode na tvojim adresama.",
-  "start_url": "/",
+  "start_url": "/app/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#f6faf6",
