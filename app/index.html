@@ -1649,6 +1649,7 @@ function sidebar(){
       ${navBtn('home','Početna','home')}
       ${navBtn('addresses','Adrese','pin')}
       ${navBtn('announcements','Najave','clock')}
+      ${navBtn('history','Istorija','bell')}
       ${navBtn('settings','Podešavanja','settings')}
       <button class="nav-btn" data-action="refresh">${icon('refresh')}<span>Osveži</span></button>
     </nav>
@@ -1680,6 +1681,7 @@ function mobileDrawer(){
         ${drawerItem('home','Početna','home')}
         ${drawerItem('addresses','Adrese','pin')}
         ${drawerItem('announcements','Najave','clock')}
+        ${drawerItem('history','Istorija','bell')}
         ${drawerItem('settings','Podešavanja','settings')}
       </nav>
       <div class="mobile-drawer-actions">
@@ -1696,6 +1698,7 @@ function page(){
   if(state.tab==='home') return home();
   if(state.tab==='addresses') return addresses();
   if(state.tab==='announcements') return announcements();
+  if(state.tab==='history') return historyPage();
   return settings();
 }
 function isStandalone(){
@@ -1858,9 +1861,12 @@ function addressCard(a){return `<div class="address-row"><div class="home-icon">
 function announcements(){
   const ms=matches();
   return `<section class="hero"><div class="eyebrow">Najave</div><h1>Najave za tvoje adrese</h1><p>Detalje otvori samo za najavu koja te zanima.</p></section>
-  <div class="stack">${ms.length?ms.map(m=>`${summaryAlert(m)}${state.expandedEventId===m.event.id?detailsCard(m):''}`).join(''):`<div class="card card-pad"><div class="empty"><strong>Nema aktivnih najava</strong><div>Za sada nema objavljenih prekida za tvoje lokacije.</div></div></div>`}</div>
+  <div class="stack">${ms.length?ms.map(m=>`${summaryAlert(m)}${state.expandedEventId===m.event.id?detailsCard(m):''}`).join(''):`<div class="card card-pad"><div class="empty"><strong>Nema aktivnih najava</strong><div>Za sada nema objavljenih prekida za tvoje lokacije.</div></div></div>`}</div>`;
+}
+function historyPage(){
+  return `<section class="hero"><div class="eyebrow">Istorija</div><h1>Istorija obaveštenja</h1><p>Sve push poruke koje ti je Najavi poslao.</p></section>
   <section class="history-section">
-    <div class="card-head history-head"><div><h3>Istorija notifikacija</h3><p>Poslednje push poruke koje su ti poslate.</p></div><button class="btn-secondary" data-action="refresh-history">${icon('refresh','icon sm')}Osveži</button></div>
+    <div class="card-head history-head"><div><h3>Poslata obaveštenja</h3><p>Najnovije poruke su prikazane prve.</p></div><button class="btn-secondary" data-action="refresh-history">${icon('refresh','icon sm')}Osveži</button></div>
     ${historyList()}
   </section>`;
 }
@@ -1923,7 +1929,7 @@ function render(){
   bind();
 }
 function bind(){
-  document.querySelectorAll('[data-tab]').forEach(el=>el.onclick=()=>{state.tab=el.dataset.tab;state.profileOpen=false;state.mobileMenuOpen=false;render();if(state.tab==='announcements')loadHistory()});
+  document.querySelectorAll('[data-tab]').forEach(el=>el.onclick=()=>{state.tab=el.dataset.tab;state.profileOpen=false;state.mobileMenuOpen=false;render();if(state.tab==='history')loadHistory()});
   document.querySelectorAll('[data-auth-mode]').forEach(el=>el.onclick=()=>{
     const next=el.dataset.authMode;
     if(next==='login'&&state.resetToken){
@@ -2219,11 +2225,11 @@ async function installApp(){
 }
 async function loadHistory(){
   if(!state.user)return;
-  state.historyLoading=true;if(state.tab==='announcements')render();
+  state.historyLoading=true;if(state.tab==='history')render();
   try{
     const res=await fetch('/api/notification-history');
     if(res.ok){const data=await res.json();state.history=Array.isArray(data.items)?data.items:[]}
-  }catch{}finally{state.historyLoading=false;if(state.tab==='announcements')render()}
+  }catch{}finally{state.historyLoading=false;if(state.tab==='history')render()}
 }
 async function loadOutages(){
   state.loading=true; render();
