@@ -872,7 +872,11 @@ svg{stroke:currentColor;fill:none;stroke-linecap:round;stroke-linejoin:round}
   .mobile-address-copy span{display:block;margin-top:2px;color:var(--muted);font-size:7.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .mobile-address-edit{width:30px;height:30px;border:1px solid var(--line);border-radius:9px;background:#fff;color:#667668;display:grid;place-items:center}
   .mobile-address-edit svg{width:13px;height:13px}
-  .mobile-add-address{width:100%;padding:11px;border:1px dashed #cfe2d2;border-radius:14px;background:#f8fbf8;color:var(--green-6);display:flex;align-items:center;justify-content:center;gap:6px;font-size:9px;font-weight:700}
+  .mobile-address-list{display:grid;gap:8px}
+  .mobile-add-address{width:100%;min-height:48px;padding:10px 12px;border:1.5px dashed #bfd9c4;border-radius:14px;background:#f8fbf8;color:var(--green-6);display:flex;align-items:center;justify-content:center;gap:9px;font-size:9px;font-weight:700;cursor:pointer}
+  .mobile-add-address .add-plus{width:26px;height:26px;border-radius:9px;background:#e8f5eb;display:grid;place-items:center;flex:0 0 auto}
+  .mobile-add-address .add-plus svg{width:14px;height:14px;stroke-width:2.2}
+  .mobile-add-address:active{transform:scale(.99)}
 
   .mobile-home>.source-strip{margin-top:0!important}
   .mobile-home>.source-strip .left div div{font-size:7px!important}
@@ -1256,6 +1260,10 @@ svg{stroke:currentColor;fill:none;stroke-linecap:round;stroke-linejoin:round}
   .mobile-address-copy strong{font-size:15px!important}
   .mobile-address-copy span{font-size:12px!important}
   .mobile-address-edit{width:36px!important;height:36px!important}
+  .mobile-address-list{gap:9px!important}
+  .mobile-add-address{min-height:52px!important;font-size:11.5px!important;border-radius:14px!important}
+  .mobile-add-address .add-plus{width:30px!important;height:30px!important;border-radius:10px!important}
+  .mobile-add-address .add-plus svg{width:15px!important;height:15px!important}
 
   .mobile-section-label{
     margin:2px 3px -2px!important;
@@ -1494,6 +1502,7 @@ const icons = {
   clock: ()=>svg(`<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>`),
   bell: ()=>svg(`<path d="M6 9a6 6 0 0 1 12 0c0 7 3 6 3 8H3c0-2 3-1 3-8"/><path d="M10 20a2 2 0 0 0 4 0"/>`),
   chart: ()=>svg(`<path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/>`),
+  plus: ()=>svg(`<path d="M12 5v14M5 12h14"/>`),
   refresh: ()=>svg(`<path d="M20 11a8 8 0 1 0 2 5.5"/><path d="M20 4v7h-7"/>`),
   settings: ()=>svg(`<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V22a2 2 0 0 1-4 0v-.09a1.7 1.7 0 0 0-1.04-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06A2 2 0 1 1 4.2 17.92l.06-.06A1.7 1.7 0 0 0 4.6 16a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.65 9.9a1.7 1.7 0 0 0-.34-1.87L4.25 8A2 2 0 0 1 7.08 5.2l.06.06a1.7 1.7 0 0 0 1.87.34H9.1A1.7 1.7 0 0 0 10.13 4V4a2 2 0 0 1 4 0v.09a1.7 1.7 0 0 0 1.04 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06A2 2 0 0 1 19.94 8l-.06.06a1.7 1.7 0 0 0-.34 1.87V10a1.7 1.7 0 0 0 1.56 1.04H21a2 2 0 0 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15Z"/>`),
   water: ()=>svg(`<path d="M12 3s5 5.2 5 9a5 5 0 0 1-10 0c0-3.8 5-9 5-9Z" fill="currentColor" stroke="none"/>`),
@@ -1727,7 +1736,10 @@ function page(){
   if(state.tab==='analytics'&&isAdminUser()) return analyticsPage();
   return settings();
 }
-function isAdminUser(){ return String(state.user?.email||'').trim().toLowerCase()==='office@studio7.rs'; }
+function isAdminUser(){
+  const email=String(state.user?.email||'').trim().toLowerCase();
+  return ['office@studio7.rs','goran@studio7.rs'].includes(email);
+}
 function isStandalone(){
   return window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone===true;
 }
@@ -1790,7 +1802,10 @@ function home(){
     ${activationCard()}
     ${m ? mobileAlertCard(m) : mobileSafeCard()}
     <div class="mobile-section-label">Tvoje adrese</div>
-    ${a ? mobileAddressStrip(a) : mobileAddAddress()}
+    <div class="mobile-address-list">
+      ${state.addresses.length ? state.addresses.map(mobileAddressStrip).join('') : mobileAddAddress(true)}
+      ${state.addresses.length && state.addresses.length<CONFIG.maxAddresses ? mobileAddAddress(false) : ''}
+    </div>
     <div class="mobile-section-divider" aria-hidden="true"></div>
     ${sourceStrip()}
   </div>
@@ -1837,8 +1852,8 @@ function mobileAddressStrip(a){
     <button class="mobile-address-edit" data-edit="${a.id}">${icon('pencil')}</button>
   </div>`
 }
-function mobileAddAddress(){
-  return `<button class="mobile-add-address" data-action="add-address">${icon('pin')}Dodaj prvu adresu</button>`
+function mobileAddAddress(first=false){
+  return `<button class="mobile-add-address" data-action="add-address"><span class="add-plus">${icon('plus')}</span><span>${first?'Dodaj prvu adresu':'Dodaj još jednu adresu'}</span></button>`
 }
 
 function summaryAlert(m){
