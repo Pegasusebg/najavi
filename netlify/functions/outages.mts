@@ -320,9 +320,9 @@ function parseHeatingAddress(raw: string) {
   const left = raw.split(/\s+-\s+/)[0]?.trim() || "";
   if (!left) return null;
   const cleaned = left.replace(/\s*\([^)]*\)\s*$/,"").trim();
-  const m = cleaned.match(/^(.+?)\s+(\d+[A-Za-zА-Яа-я]?\s*(?:[-,/]\s*\d+[A-Za-zА-Яа-я]?)*)$/u);
+  const m = cleaned.match(/^(.+?)\s+(\d+[A-Za-zА-Яа-я]{0,4}(?:\s*(?:-|,|\/|\bi\b)\s*\d+[A-Za-zА-Яа-я]{0,4})*)$/iu);
   if (!m) return null;
-  return {street:m[1].trim(), numberSpec:m[2].replace(/\s+/g,"").trim()};
+  return {street:m[1].trim(), numberSpec:m[2].replace(/\s+i\s+/gi,",").replace(/\s+/g,"").trim()};
 }
 
 function parseHeating(html: string, sourceUrl: string): OutageEvent[] {
@@ -336,6 +336,7 @@ function parseHeating(html: string, sourceUrl: string): OutageEvent[] {
     const parsed = parseHeatingAddress(line);
     if (!parsed) continue;
     const note = line.split(/\s+-\s+/).slice(1).join(" - ").trim() || "Prekid u isporuci toplotne energije.";
+    if (/potrošne\s+tople\s+vode/i.test(note) && !/grejanj/i.test(note)) continue;
     out.push({
       id:"heating-"+stableId([date,parsed.street,parsed.numberSpec,sourceUrl]),
       utility:"heating",
