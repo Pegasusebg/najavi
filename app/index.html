@@ -1289,7 +1289,7 @@ svg{stroke:currentColor;fill:none;stroke-linecap:round;stroke-linejoin:round}
     color:#55705d!important;
   }
   .mobile-section-divider{height:1px!important;background:#dbe7dd!important;margin:4px 4px 1px!important}
-  .source-strip{padding:14px!important;min-height:82px!important;align-items:center!important}
+  .source-strip{padding:14px!important;min-height:98px!important;align-items:center!important}
   .source-strip .left{align-items:flex-start!important;min-width:0!important;flex:1 1 auto!important}
   .source-strip .left>svg{margin-top:2px!important;flex:0 0 auto!important}
   .source-copy{min-width:0!important}
@@ -1524,7 +1524,8 @@ const CONFIG = {
   maxAddresses: 3,
   sources: {
     electricity: 'https://elektrodistribucija.rs/',
-    water: 'https://www.beograd.rs/lat/servisne-informacije/vodovod-i-kanalizacija/'
+    water: 'https://www.beograd.rs/lat/servisne-informacije/vodovod-i-kanalizacija/',
+    heating: 'https://www.beograd.rs/lat/servisne-informacije/grejanje'
   }
 };
 
@@ -1536,7 +1537,7 @@ const load=(k,f)=>{try{return JSON.parse(localStorage.getItem(k)) ?? f}catch{ret
 const save=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
 const state = {
   tab:'home',
-  addresses: load('najava_addresses', [{id: crypto.randomUUID(), label:'Dom', street:'Jablanička', number:'54', municipality:'Čukarica', electricity:true, water:true}]),
+  addresses: load('najava_addresses', [{id: crypto.randomUUID(), label:'Dom', street:'Jablanička', number:'54', municipality:'Čukarica', electricity:true, water:true, heating:true}]),
   prefs: load('najava_prefs', {dayBefore:true,morning:true,twoHours:false}),
   modal:null,
   onboarded:true,
@@ -1584,6 +1585,7 @@ const icons = {
   refresh: ()=>svg(`<path d="M20 11a8 8 0 1 0 2 5.5"/><path d="M20 4v7h-7"/>`),
   settings: ()=>svg(`<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V22a2 2 0 0 1-4 0v-.09a1.7 1.7 0 0 0-1.04-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06A2 2 0 1 1 4.2 17.92l.06-.06A1.7 1.7 0 0 0 4.6 16a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.65 9.9a1.7 1.7 0 0 0-.34-1.87L4.25 8A2 2 0 0 1 7.08 5.2l.06.06a1.7 1.7 0 0 0 1.87.34H9.1A1.7 1.7 0 0 0 10.13 4V4a2 2 0 0 1 4 0v.09a1.7 1.7 0 0 0 1.04 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06A2 2 0 0 1 19.94 8l-.06.06a1.7 1.7 0 0 0-.34 1.87V10a1.7 1.7 0 0 0 1.56 1.04H21a2 2 0 0 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15Z"/>`),
   water: ()=>svg(`<path d="M12 3s5 5.2 5 9a5 5 0 0 1-10 0c0-3.8 5-9 5-9Z" fill="currentColor" stroke="none"/>`),
+  heating: ()=>svg(`<path d="M13.6 2.5c.4 3-1.5 4.4-2.8 5.8-1.1 1.2-1.8 2.3-1.2 4 .8-1.1 1.7-1.8 2.6-2.7.2 2.1 2.4 3.2 2.4 6a4.6 4.6 0 0 1-9.2 0c0-3.1 2-5.2 4.2-7.5 1.7-1.8 3.3-3.4 4-5.6Z" fill="currentColor" stroke="none"/>`),
   cal: ()=>svg(`<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M16 3v4M8 3v4M3 10h18"/>`),
   timer: ()=>svg(`<circle cx="12" cy="13" r="8"/><path d="M12 13V9m0-6h4M10 2h4"/>`),
   check: ()=>svg(`<circle cx="12" cy="12" r="10" fill="currentColor" stroke="none"/><path d="m8 12 2.5 2.5L16 9" stroke="#fff" stroke-width="2.4"/>`),
@@ -1629,9 +1631,9 @@ function matchesNumberSpec(spec,n){
   });
 }
 function matchEvent(address,ev){
-  if(address.municipality&&norm(address.municipality)!==norm(ev.municipality))return null;
+  if(ev.municipality&&address.municipality&&norm(address.municipality)!==norm(ev.municipality))return null;
   if(normStreet(address.street)!==normStreet(ev.street))return null;
-  const monitored=ev.utility==='electricity'?address.electricity:address.water;
+  const monitored=ev.utility==='electricity'?address.electricity:ev.utility==='water'?address.water:address.heating!==false;
   if(!monitored)return null;
   const n=houseNum(address.number);
   if(ev.scope==='all')return {confidence:'certain'};
@@ -1670,12 +1672,12 @@ function matches(){
 }
 function fmtDate(iso){const d=new Date(iso+'T12:00:00'); return new Intl.DateTimeFormat('sr-RS',{day:'numeric',month:'long'}).format(d)}
 function duration(start,end){ const [sh,sm]=start.split(':').map(Number), [eh,em]=end.split(':').map(Number); let mins=(eh*60+em)-(sh*60+sm); if(mins<0) mins+=1440; const h=Math.floor(mins/60), m=mins%60; return `${h} h${m?` ${m} min`:''}`; }
-function utilityLabel(u){ return u==='electricity'?'Struja':'Voda'; }
+function utilityLabel(u){ return u==='electricity'?'Struja':u==='water'?'Voda':'Grejanje'; }
 function isLong(ev){return ((Number(ev.end.slice(0,2))*60+Number(ev.end.slice(3)))-(Number(ev.start.slice(0,2))*60+Number(ev.start.slice(3))))>=180}
 function sourceStatus(){
-  const e=state.sources.electricity,w=state.sources.water;
-  const count=(e?.ok?1:0)+(w?.ok?1:0);
-  return state.loading?'Proveravam…':`${count}/2 aktivna`;
+  const e=state.sources.electricity,w=state.sources.water,h=state.sources.heating;
+  const count=(e?.ok?1:0)+(w?.ok?1:0)+(h?.ok?1:0);
+  return state.loading?'Proveravam…':`${count}/3 aktivna`;
 }
 
 function loadingScreen(){return `<div class="loading-screen"><div><div class="spinner"></div>Učitavanje aplikacije…</div></div>`}
@@ -1902,9 +1904,9 @@ function home(){
 function mobileAlertCard(m){
   const ev=m.event,a=m.address;
   return `<div class="mobile-primary-alert">
-    <div class="mobile-alert-icon">${icon(ev.utility==='electricity'?'bolt':'water')}</div>
+    <div class="mobile-alert-icon">${icon(ev.utility==='electricity'?'bolt':ev.utility==='water'?'water':'heating')}</div>
     <div class="mobile-alert-copy">
-      <div class="mobile-alert-title">Prekid ${ev.utility==='electricity'?'struje':'vode'} · ${escapeHtml(a.label)}</div>
+      <div class="mobile-alert-title">Prekid ${ev.utility==='electricity'?'struje':ev.utility==='water'?'vode':'grejanja'} · ${escapeHtml(a.label)}</div>
       <div class="mobile-alert-time">${fmtDate(ev.date)} · ${ev.start}–${ev.end}</div>
       <div class="mobile-alert-address">${icon('pin','icon xs')}${escapeHtml(a.street)} ${escapeHtml(a.number)}</div>
     </div>
@@ -1927,7 +1929,7 @@ function mobileSafeCard(){
 function mobileAddressStrip(a){
   return `<div class="mobile-address-strip">
     <div class="mobile-address-icon">${icon('home')}</div>
-    <div class="mobile-address-copy"><strong>${escapeHtml(a.label)}</strong><span>${escapeHtml(a.street)} ${escapeHtml(a.number)}, ${escapeHtml(a.municipality)}</span></div>
+    <div class="mobile-address-copy"><strong>${escapeHtml(a.label)}</strong><span>${escapeHtml(a.street)} ${escapeHtml(a.number)}, ${escapeHtml(a.municipality)}</span><span class="mobile-address-services">${[a.electricity?'Struja':'',a.water?'Voda':'',a.heating!==false?'Grejanje':''].filter(Boolean).join(' · ')}</span></div>
     <button class="mobile-address-edit" data-edit="${a.id}">${icon('pencil')}</button>
   </div>`
 }
@@ -1937,7 +1939,7 @@ function mobileAddAddress(first=false){
 
 function summaryAlert(m){
   const ev=m.event, a=m.address;
-  return `<div class="card alert-card summary-clickable" data-action="toggle-details" data-event-id="${ev.id}"><div class="alert-icon">${icon('bolt')}</div><div><div class="alert-title">Prekid ${ev.utility==='electricity'?'struje':'vode'} · ${escapeHtml(a.label)}</div><div class="alert-meta"><span>${icon('cal','icon sm')}${fmtDate(ev.date)}</span><span>${ev.start}–${ev.end}</span><span>${icon('pin','icon sm')}${escapeHtml(a.street)} ${escapeHtml(a.number)}</span></div></div><button class="btn-primary" type="button">${state.expandedEventId===ev.id?'Sakrij':'Detalji'}</button></div>`;
+  return `<div class="card alert-card summary-clickable" data-action="toggle-details" data-event-id="${ev.id}"><div class="alert-icon">${icon('bolt')}</div><div><div class="alert-title">Prekid ${ev.utility==='electricity'?'struje':ev.utility==='water'?'vode':'grejanja'} · ${escapeHtml(a.label)}</div><div class="alert-meta"><span>${icon('cal','icon sm')}${fmtDate(ev.date)}</span><span>${ev.start}–${ev.end}</span><span>${icon('pin','icon sm')}${escapeHtml(a.street)} ${escapeHtml(a.number)}</span></div></div><button class="btn-primary" type="button">${state.expandedEventId===ev.id?'Sakrij':'Detalji'}</button></div>`;
 }
 function detailsCard(m){
   const ev=m.event, a=m.address;
@@ -1948,7 +1950,7 @@ function detailsCard(m){
         <div class="detail-icon warn">${icon(ev.utility==='electricity'?'bolt':'water')}</div>
         <div>
           <div class="badges">
-            <span class="badge electric">${icon(ev.utility==='electricity'?'bolt':'water','icon xs')}${utilityLabel(ev.utility)}</span>
+            <span class="badge electric">${icon(ev.utility==='electricity'?'bolt':ev.utility==='water'?'water':'heating','icon xs')}${utilityLabel(ev.utility)}</span>
             <span class="badge blue">ZVANIČNO</span>
             <span class="badge green">${icon('check','icon xs')}Adresa pogođena</span>
           </div>
@@ -1969,16 +1971,16 @@ function addressesAside(){
   const a=state.addresses[0];
   return `<div class="card aside-card">
     <div class="card-head"><div><h3>Moje adrese</h3><p>Do ${CONFIG.maxAddresses} lokacije</p></div><button class="btn-secondary" ${a ? `data-edit="${a.id}"` : 'data-action="add-address"'}>${icon('pencil','icon sm')}${a?'Uredi':'Dodaj'}</button></div>
-    ${a ? `<div class="address-row"><div class="home-icon">${icon('home')}</div><div><div class="address-name">${escapeHtml(a.label)}</div><div class="address-sub">${icon('pin','icon sm')}${escapeHtml(a.street)} ${escapeHtml(a.number)}, ${escapeHtml(a.municipality)}</div><div class="chips">${a.electricity?`<span class="chip electric">${icon('bolt','icon xs')}Struja</span>`:''}${a.water?`<span class="chip water">${icon('water','icon xs')}Voda</span>`:''}</div></div><button class="icon-btn" data-edit="${a.id}">${icon('dots')}</button></div>` : `<div class="empty"><strong>Nema adresa</strong><div>Dodaj prvu lokaciju.</div></div>`}
+    ${a ? `<div class="address-row"><div class="home-icon">${icon('home')}</div><div><div class="address-name">${escapeHtml(a.label)}</div><div class="address-sub">${icon('pin','icon sm')}${escapeHtml(a.street)} ${escapeHtml(a.number)}, ${escapeHtml(a.municipality)}</div><div class="chips">${a.electricity?`<span class="chip electric">${icon('bolt','icon xs')}Struja</span>`:''}${a.water?`<span class="chip water">${icon('water','icon xs')}Voda</span>`:''}${a.heating!==false?`<span class="chip heating">${icon('heating','icon xs')}Grejanje</span>`:''}</div></div><button class="icon-btn" data-edit="${a.id}">${icon('dots')}</button></div>` : `<div class="empty"><strong>Nema adresa</strong><div>Dodaj prvu lokaciju.</div></div>`}
   </div>`;
 }
-function sourceStrip(){return `<div class="source-strip"><div class="left">${icon('info')}<div class="source-copy"><div class="source-label">Zvanični izvori</div><div class="source-name">Elektrodistribucija Srbije</div><div class="source-name">Grad Beograd · Vodovod i kanalizacija</div><div class="source-meta"><span class="source-health">${sourceStatus()}</span><span class="source-refresh">Podaci poslednji put osveženi u ${state.lastChecked||'—'}</span></div></div></div></div>`}
+function sourceStrip(){return `<div class="source-strip"><div class="left">${icon('info')}<div class="source-copy"><div class="source-label">Zvanični izvori</div><div class="source-name">Elektrodistribucija Srbije</div><div class="source-name">Grad Beograd · Vodovod i kanalizacija</div><div class="source-name">Beogradske elektrane · Grejanje</div><div class="source-meta"><span class="source-health">${sourceStatus()}</span><span class="source-refresh">Podaci poslednji put osveženi u ${state.lastChecked||'—'}</span></div></div></div></div>`}
 function addresses(){
   return `<section class="hero"><div class="eyebrow">Adrese</div><h1>Moje lokacije</h1><p>Dodaj i uređuj adrese za koje želiš upozorenja.</p></section>
   <div class="card card-pad"><div class="card-head"><div><h3>${state.addresses.length}/${CONFIG.maxAddresses} adrese</h3><p>Prati dom, posao ili roditelje.</p></div>${state.addresses.length<CONFIG.maxAddresses?`<button class="btn-primary" data-action="add-address">Dodaj adresu</button>`:''}</div>
   <div class="stack">${state.addresses.map(addressCard).join('')}</div></div>`;
 }
-function addressCard(a){return `<div class="address-row"><div class="home-icon">${icon('home')}</div><div><div class="address-name">${escapeHtml(a.label)}</div><div class="address-sub">${icon('pin','icon sm')}${escapeHtml(a.street)} ${escapeHtml(a.number)}, ${escapeHtml(a.municipality)}</div><div class="chips">${a.electricity?`<span class="chip electric">${icon('bolt','icon xs')}Struja</span>`:''}${a.water?`<span class="chip water">${icon('water','icon xs')}Voda</span>`:''}</div></div><button class="icon-btn" data-edit="${a.id}">${icon('dots')}</button></div>`}
+function addressCard(a){return `<div class="address-row"><div class="home-icon">${icon('home')}</div><div><div class="address-name">${escapeHtml(a.label)}</div><div class="address-sub">${icon('pin','icon sm')}${escapeHtml(a.street)} ${escapeHtml(a.number)}, ${escapeHtml(a.municipality)}</div><div class="chips">${a.electricity?`<span class="chip electric">${icon('bolt','icon xs')}Struja</span>`:''}${a.water?`<span class="chip water">${icon('water','icon xs')}Voda</span>`:''}${a.heating!==false?`<span class="chip heating">${icon('heating','icon xs')}Grejanje</span>`:''}</div></div><button class="icon-btn" data-edit="${a.id}">${icon('dots')}</button></div>`}
 function announcements(){
   const ms=matches();
   return `<section class="hero"><div class="eyebrow">Najave</div><h1>Najave za tvoje adrese</h1><p>Detalje otvori samo za najavu koja te zanima.</p></section>
@@ -1999,7 +2001,7 @@ function historyList(){
 function historyItem(item){
   const when=new Intl.DateTimeFormat('sr-Latn-RS',{dateStyle:'medium',timeStyle:'short'}).format(new Date(item.sentAt));
   const kind=item.kind==='dayBefore'?'24 h ranije':item.kind==='morning'?'Jutarnji podsetnik':item.kind==='twoHours'?'2 h ranije':'Test';
-  return `<div class="history-item"><div class="history-icon">${item.utility==='water'?icon('water'):icon('bell')}</div><div class="history-copy"><strong>${escapeHtml(item.title||'Notifikacija')}</strong><span>${escapeHtml(item.body||'')}</span><small>${kind} · ${when}</small></div></div>`;
+  return `<div class="history-item"><div class="history-icon">${item.utility==='water'?icon('water'):item.utility==='heating'?icon('heating'):icon('bell')}</div><div class="history-copy"><strong>${escapeHtml(item.title||'Notifikacija')}</strong><span>${escapeHtml(item.body||'')}</span><small>${kind} · ${when}</small></div></div>`;
 }
 function analyticsPage(){
   const a=state.analytics;
@@ -2128,8 +2130,8 @@ function prefRow(key,title,desc){
 }
 function modal(){
   if(state.modal!=='address') return '';
-  const a = state.editId ? state.addresses.find(x=>x.id===state.editId) : {label:'Dom', street:'', number:'', municipality:'Čukarica', electricity:true, water:true};
-  return `<div class="modal-backdrop" id="modalBackdrop"><div class="card modal-card"><div class="card-head"><div><h3>${state.editId?'Izmeni adresu':'Nova adresa'}</h3><p>Dodaj lokaciju koju želiš da pratiš.</p></div><button class="icon-btn" data-action="close-modal">×</button></div><form id="addressForm"><div style="display:grid;gap:14px"><div><label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">Naziv</label><input name="label" value="${escapeAttr(a.label)}" style="width:100%;padding:14px 16px;border-radius:14px;border:1px solid var(--line)" required></div><div class="modal-address-grid" style="display:grid;grid-template-columns:minmax(0,1fr) 120px;gap:10px"><div><label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">Ulica</label><input name="street" value="${escapeAttr(a.street)}" style="width:100%;padding:14px 16px;border-radius:14px;border:1px solid var(--line)" required></div><div><label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">Broj</label><input name="number" value="${escapeAttr(a.number)}" style="width:100%;padding:14px 16px;border-radius:14px;border:1px solid var(--line)" required></div></div><div><label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">Opština</label><select name="municipality" style="width:100%;padding:14px 16px;border-radius:14px;border:1px solid var(--line)">${municipalities.map(m=>`<option ${m===a.municipality?'selected':''}>${m}</option>`).join('')}</select></div><div class="service-choice"><label><input type="checkbox" name="electricity" ${a.electricity?'checked':''}> Prati struju</label><label><input type="checkbox" name="water" ${a.water?'checked':''}> Prati vodu</label></div><button class="btn-primary" type="submit">Sačuvaj</button>${state.editId?`<button type="button" class="btn-secondary" data-action="delete-address" style="margin-top:10px;width:100%;justify-content:center">Obriši adresu</button>`:''}</div></form></div></div>`;
+  const a = state.editId ? state.addresses.find(x=>x.id===state.editId) : {label:'Dom', street:'', number:'', municipality:'Čukarica', electricity:true, water:true, heating:true};
+  return `<div class="modal-backdrop" id="modalBackdrop"><div class="card modal-card"><div class="card-head"><div><h3>${state.editId?'Izmeni adresu':'Nova adresa'}</h3><p>Dodaj lokaciju koju želiš da pratiš.</p></div><button class="icon-btn" data-action="close-modal">×</button></div><form id="addressForm"><div style="display:grid;gap:14px"><div><label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">Naziv</label><input name="label" value="${escapeAttr(a.label)}" style="width:100%;padding:14px 16px;border-radius:14px;border:1px solid var(--line)" required></div><div class="modal-address-grid" style="display:grid;grid-template-columns:minmax(0,1fr) 120px;gap:10px"><div><label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">Ulica</label><input name="street" value="${escapeAttr(a.street)}" style="width:100%;padding:14px 16px;border-radius:14px;border:1px solid var(--line)" required></div><div><label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">Broj</label><input name="number" value="${escapeAttr(a.number)}" style="width:100%;padding:14px 16px;border-radius:14px;border:1px solid var(--line)" required></div></div><div><label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">Opština</label><select name="municipality" style="width:100%;padding:14px 16px;border-radius:14px;border:1px solid var(--line)">${municipalities.map(m=>`<option ${m===a.municipality?'selected':''}>${m}</option>`).join('')}</select></div><div class="service-choice"><label><input type="checkbox" name="electricity" ${a.electricity?'checked':''}> Prati struju</label><label><input type="checkbox" name="water" ${a.water?'checked':''}> Prati vodu</label><label><input type="checkbox" name="heating" ${a.heating!==false?'checked':''}> Prati grejanje</label></div><button class="btn-primary" type="submit">Sačuvaj</button>${state.editId?`<button type="button" class="btn-secondary" data-action="delete-address" style="margin-top:10px;width:100%;justify-content:center">Obriši adresu</button>`:''}</div></form></div></div>`;
 }
 function render(){
   document.getElementById('app').innerHTML = !state.authChecked ? loadingScreen() : (state.user ? layout() : authScreen());
@@ -2264,7 +2266,7 @@ function bind(){
   document.querySelectorAll('[data-action="show-install-guide"]').forEach(el=>el.onclick=()=>{state.installOnboarding=true;render()});
   const del=document.querySelector('[data-action="delete-address"]'); if(del) del.onclick=()=>{ state.addresses=state.addresses.filter(x=>x.id!==state.editId); save('najava_addresses',state.addresses); syncUserData(); state.modal=null; state.editId=null; toast('Adresa je obrisana.'); render(); };
   const form=document.getElementById('addressForm');
-  if(form) form.onsubmit=(e)=>{ e.preventDefault(); const fd=new FormData(form); const data={ id: state.editId || crypto.randomUUID(), label:String(fd.get('label')).trim(), street:String(fd.get('street')).trim(), number:String(fd.get('number')).trim(), municipality:String(fd.get('municipality')), electricity: fd.get('electricity')==='on', water: fd.get('water')==='on' }; if(!data.electricity && !data.water) return toast('Izaberi bar jednu uslugu.'); if(state.editId) state.addresses=state.addresses.map(x=>x.id===data.id?data:x); else state.addresses.push(data); save('najava_addresses',state.addresses); syncUserData(); state.modal=null; state.editId=null; toast('Adresa je sačuvana.'); render(); };
+  if(form) form.onsubmit=(e)=>{ e.preventDefault(); const fd=new FormData(form); const data={ id: state.editId || crypto.randomUUID(), label:String(fd.get('label')).trim(), street:String(fd.get('street')).trim(), number:String(fd.get('number')).trim(), municipality:String(fd.get('municipality')), electricity: fd.get('electricity')==='on', water: fd.get('water')==='on', heating: fd.get('heating')==='on' }; if(!data.electricity && !data.water && !data.heating) return toast('Izaberi bar jednu uslugu.'); if(state.editId) state.addresses=state.addresses.map(x=>x.id===data.id?data:x); else state.addresses.push(data); save('najava_addresses',state.addresses); syncUserData(); state.modal=null; state.editId=null; toast('Adresa je sačuvana.'); render(); };
 }
 async function checkAuth(){
   try{
@@ -2286,7 +2288,7 @@ async function loadUserData(){
     const data=await res.json();
     const remoteHas=Array.isArray(data.addresses)&&data.addresses.length;
     if(remoteHas){
-      state.addresses=data.addresses;state.prefs={...state.prefs,...(data.prefs||{})};
+      state.addresses=data.addresses.map(x=>({...x,heating:x.heating!==false}));state.prefs={...state.prefs,...(data.prefs||{})};
       save('najava_addresses',state.addresses);save('najava_prefs',state.prefs);
     }else if(state.addresses.length){await syncUserData()}
   }catch{}
