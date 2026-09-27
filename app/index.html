@@ -1673,7 +1673,7 @@ function matches(){
 function fmtDate(iso){const d=new Date(iso+'T12:00:00'); return new Intl.DateTimeFormat('sr-RS',{day:'numeric',month:'long'}).format(d)}
 function duration(start,end){ const [sh,sm]=start.split(':').map(Number), [eh,em]=end.split(':').map(Number); let mins=(eh*60+em)-(sh*60+sm); if(mins<0) mins+=1440; const h=Math.floor(mins/60), m=mins%60; return `${h} h${m?` ${m} min`:''}`; }
 function utilityLabel(u){ return u==='electricity'?'Struja':u==='water'?'Voda':'Grejanje'; }
-function eventTitle(ev){return ev.kind==='planned_work'?'Planirani radovi na toplovodu':`${eventTitle(ev)}`;}
+function eventTitle(ev){return ev.kind==='planned_work'?'Planirani radovi na toplovodu':`Prekid ${ev.utility==='electricity'?'struje':ev.utility==='water'?'vode':'grejanja'}`;}
 function eventTimeLabel(ev){return ev.kind==='planned_work'?'Objavljeno '+fmtDate(ev.publishedAt||ev.date):ev.utility==='heating'?'Aktuelni prekid':ev.start+'–'+ev.end;}
 function eventStatusLabel(ev){return ev.kind==='planned_work'?'Radovi u tvojoj ulici':'Adresa pogođena';}
 function isLong(ev){if(ev.utility==='heating')return false;return ((Number(ev.end.slice(0,2))*60+Number(ev.end.slice(3)))-(Number(ev.start.slice(0,2))*60+Number(ev.start.slice(3))))>=180}
@@ -1942,7 +1942,7 @@ function mobileAddAddress(first=false){
 
 function summaryAlert(m){
   const ev=m.event, a=m.address;
-  return `<div class="card alert-card summary-clickable" data-action="toggle-details" data-event-id="${ev.id}"><div class="alert-icon">${icon('bolt')}</div><div><div class="alert-title">${eventTitle(ev)} · ${escapeHtml(a.label)}</div><div class="alert-meta"><span>${icon('cal','icon sm')}${fmtDate(ev.date)}</span><span>${eventTimeLabel(ev)}</span><span>${icon('pin','icon sm')}${escapeHtml(a.street)} ${escapeHtml(a.number)}</span></div></div><button class="btn-primary" type="button">${state.expandedEventId===ev.id?'Sakrij':'Detalji'}</button></div>`;
+  return `<div class="card alert-card summary-clickable" data-action="toggle-details" data-event-id="${ev.id}"><div class="alert-icon">${icon(ev.utility==='electricity'?'bolt':ev.utility==='water'?'water':'heating')}</div><div><div class="alert-title">${eventTitle(ev)} · ${escapeHtml(a.label)}</div><div class="alert-meta"><span>${icon('cal','icon sm')}${ev.kind==='planned_work'?eventTimeLabel(ev):fmtDate(ev.date)}</span><span>${ev.kind==='planned_work'?'Planirani radovi':eventTimeLabel(ev)}</span><span>${icon('pin','icon sm')}${escapeHtml(a.street)} ${escapeHtml(a.number)}</span></div></div><button class="btn-primary" type="button">${state.expandedEventId===ev.id?'Sakrij':'Detalji'}</button></div>`;
 }
 function detailsCard(m){
   const ev=m.event, a=m.address;
@@ -1950,7 +1950,7 @@ function detailsCard(m){
     <div class="card-head"><div><h3>Detalji najave</h3><p>Najbliži prekid</p></div></div>
     <div class="detail-shell">
       <div class="detail-header">
-        <div class="detail-icon warn">${icon(ev.utility==='electricity'?'bolt':'water')}</div>
+        <div class="detail-icon warn">${icon(ev.utility==='electricity'?'bolt':ev.utility==='water'?'water':'heating')}</div>
         <div>
           <div class="badges">
             <span class="badge electric">${icon(ev.utility==='electricity'?'bolt':ev.utility==='water'?'water':'heating','icon xs')}${utilityLabel(ev.utility)}</span>
