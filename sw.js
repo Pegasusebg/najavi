@@ -1,4 +1,4 @@
-const CACHE="najavi-v6";
+const CACHE="najavi-v7";
 const STATIC=["/","/app/","/manifest.webmanifest","/najava-icon.svg"];
 self.addEventListener("install",event=>{event.waitUntil(caches.open(CACHE).then(c=>c.addAll(STATIC)).catch(()=>{}));self.skipWaiting()});
 self.addEventListener("activate",event=>{event.waitUntil(Promise.all([
