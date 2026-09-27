@@ -6,7 +6,7 @@ function clean(body:any){
   const addresses=Array.isArray(body.addresses)?body.addresses.slice(0,3).map((a:any)=>({
     id:String(a.id||crypto.randomUUID()),label:String(a.label||"").slice(0,40),street:String(a.street||"").slice(0,120),
     number:String(a.number||"").slice(0,20),municipality:String(a.municipality||"").slice(0,80),
-    electricity:Boolean(a.electricity),water:Boolean(a.water)
+    electricity:Boolean(a.electricity),water:Boolean(a.water),heating:a.heating!==false
   })).filter((a:any)=>a.label&&a.street&&a.number):[];
   const p=body.prefs||{};
   return {addresses,prefs:{dayBefore:Boolean(p.dayBefore),morning:Boolean(p.morning),twoHours:Boolean(p.twoHours)},updatedAt:new Date().toISOString()};
