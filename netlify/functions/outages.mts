@@ -2,6 +2,7 @@
 const EDS_SOURCE = "https://elektrodistribucija.rs/planirana-iskljucenja/planirana-bgd";
 const EDS_DAY_BASE = "https://elektrodistribucija.rs/planirana-iskljucenja-beograd";
 const WATER_LIST = "https://www.beograd.rs/lat/servisne-informacije/vodovod-i-kanalizacija";
+const HEATING_LIST = "https://www.beograd.rs/lat/servisne-informacije/grejanje";
 
 const MUNICIPALITIES = [
   "Barajevo","Čukarica","Grocka","Lazarevac","Mladenovac","Novi Beograd","Obrenovac",
@@ -15,7 +16,7 @@ const MONTHS: Record<string, number> = {
 
 type OutageEvent = {
   id: string;
-  utility: "electricity" | "water";
+  utility: "electricity" | "water" | "heating";
   date: string;
   endDate?: string | null;
   start: string;
@@ -298,6 +299,75 @@ function parseWater(html: string, sourceUrl: string): OutageEvent[] {
   return out;
 }
 
+
+function heatingArticleLinks(html: string) {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const aRe = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = aRe.exec(html))) {
+    const href = m[1];
+    const label = inlineText(m[2]).toLowerCase();
+    if (!/prekid[u]?\s+u\s+isporuci\s+toplotne\s+energije/i.test(label) &&
+        !/Prekid-u-isporuci-toplotne-energije/i.test(href)) continue;
+    const url = absUrl(href, HEATING_LIST);
+    if (url && !seen.has(url)) { seen.add(url); out.push(url); }
+  }
+  return out.slice(0,12);
+}
+
+function parseHeatingAddress(raw: string) {
+  const left = raw.split(/\s+-\s+/)[0]?.trim() || "";
+  if (!left) return null;
+  const cleaned = left.replace(/\s*\([^)]*\)\s*$/,"").trim();
+  const m = cleaned.match(/^(.+?)\s+(\d+[A-Za-zА-Яа-я]{0,4}(?:\s*(?:-|,|\/|\bi\b)\s*\d+[A-Za-zА-Яа-я]{0,4})*)$/iu);
+  if (!m) return null;
+  return {street:m[1].trim(), numberSpec:m[2].replace(/\s+i\s+/gi,",").replace(/\s+/g,"").trim()};
+}
+
+function parseHeating(html: string, sourceUrl: string): OutageEvent[] {
+  const title = titleText(html);
+  const date = extractSerbianDate(title) || extractSerbianDate(cleanText(html));
+  if (!date) return [];
+  const lines = cleanText(html).split("\n").map(normalizeLine).filter(Boolean);
+  const out: OutageEvent[] = [];
+  for (const line of lines) {
+    if (!line.includes(" - ")) continue;
+    const parsed = parseHeatingAddress(line);
+    if (!parsed) continue;
+    const note = line.split(/\s+-\s+/).slice(1).join(" - ").trim() || "Prekid u isporuci toplotne energije.";
+    if (/potrošne\s+tople\s+vode/i.test(note) && !/grejanj/i.test(note)) continue;
+    out.push({
+      id:"heating-"+stableId([date,parsed.street,parsed.numberSpec,sourceUrl]),
+      utility:"heating",
+      date,
+      start:"00:00",
+      end:"23:59",
+      municipality:"",
+      street:parsed.street,
+      numberSpec:parsed.numberSpec,
+      scope:"numbers",
+      source:"Beogradske elektrane / Grad Beograd",
+      sourceUrl,
+      note
+    });
+  }
+  return out;
+}
+
+async function loadHeating() {
+  const listHtml = await fetchText(HEATING_LIST);
+  const links = heatingArticleLinks(listHtml);
+  const settled = await Promise.allSettled(links.map(fetchText));
+  const events: OutageEvent[] = [];
+  const errors: string[] = [];
+  settled.forEach((r,i) => {
+    if (r.status === "fulfilled") events.push(...parseHeating(r.value,links[i]));
+    else errors.push(String(r.reason));
+  });
+  return {events:events.filter(e=>withinWindow(e.date)), ok:true, errors, articlesChecked:links.length};
+}
+
 function localIsoDay(offsetDays = 0) {
   const d = new Date(Date.now() + offsetDays*86400000);
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -340,12 +410,13 @@ async function loadWater() {
 
 export default async (_req: Request) => {
   const checkedAt = new Date().toISOString();
-  const [electricity, water] = await Promise.allSettled([loadElectricity(),loadWater()]);
+  const [electricity, water, heating] = await Promise.allSettled([loadElectricity(),loadWater(),loadHeating()]);
 
   const e = electricity.status === "fulfilled" ? electricity.value : {events:[],ok:false,errors:[String(electricity.reason)]};
   const w = water.status === "fulfilled" ? water.value : {events:[],ok:false,errors:[String(water.reason)],articlesChecked:0};
+  const h = heating.status === "fulfilled" ? heating.value : {events:[],ok:false,errors:[String(heating.reason)],articlesChecked:0};
 
-  const events = [...e.events,...w.events]
+  const events = [...e.events,...w.events,...h.events]
     .sort((a,b)=>(a.date+a.start+a.municipality+a.street).localeCompare(b.date+b.start+b.municipality+b.street));
 
   return new Response(JSON.stringify({
@@ -366,6 +437,14 @@ export default async (_req: Request) => {
         count:w.events.length,
         articlesChecked:w.articlesChecked,
         error:w.errors.length ? w.errors.join(" | ").slice(0,600) : null
+      },
+      heating:{
+        ok:h.ok,
+        source:"Beogradske elektrane / Grad Beograd",
+        sourceUrl:HEATING_LIST,
+        count:h.events.length,
+        articlesChecked:h.articlesChecked,
+        error:h.errors.length ? h.errors.join(" | ").slice(0,600) : null
       }
     }
   }),{
