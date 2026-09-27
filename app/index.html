@@ -1537,7 +1537,7 @@ const load=(k,f)=>{try{return JSON.parse(localStorage.getItem(k)) ?? f}catch{ret
 const save=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
 const state = {
   tab:'home',
-  addresses: load('najava_addresses', [{id: crypto.randomUUID(), label:'Dom', street:'Jablanička', number:'54', municipality:'Čukarica', electricity:true, water:true, heating:true}]),
+  addresses: load('najava_addresses', []),
   prefs: load('najava_prefs', {dayBefore:true,morning:true,twoHours:false}),
   modal:null,
   onboarded:true,
@@ -1557,6 +1557,7 @@ const state = {
   pushChecked:false,
   installPromptReady:false,
   installOnboarding:false,
+  installOnboardingNewAccount:false,
   history:[],
   historyLoading:false,
   analytics:null,
@@ -1853,8 +1854,10 @@ function iosInstallGuide(){
 function installOnboarding(){
   if(!state.installOnboarding || !isMobileDevice() || isStandalone())return '';
   const ios=isIOS();
+  const title=state.installOnboardingNewAccount?'Nalog je kreiran — instaliraj Najavi':'Instaliraj Najavi';
+  const copy=state.installOnboardingNewAccount?'Dodaj Najavi na telefon odmah, da ti aplikacija bude pri ruci i spremna za obaveštenja.':'Tako je Najavi na telefonu kao aplikacija i spreman da te obavesti.';
   return `<div class="install-onboarding-backdrop"><div class="install-onboarding-card">
-    <div class="install-onboarding-head"><div><h3>Instaliraj Najavi</h3><p>Tako je Najavi na telefonu kao aplikacija i spreman da te obavesti.</p></div><button class="install-close" data-action="dismiss-install-onboarding" aria-label="Zatvori">${icon('close')}</button></div>
+    <div class="install-onboarding-head"><div><h3>${title}</h3><p>${copy}</p></div><button class="install-close" data-action="dismiss-install-onboarding" aria-label="Zatvori">${icon('close')}</button></div>
     ${ios?iosInstallGuide():`<div class="install-guide-card"><h4>Android / Chrome</h4><ol><li>Tapni <strong>Instaliraj aplikaciju</strong>.</li><li>Ako dugme nije dostupno: Chrome meni <strong>⋮</strong> → <strong>Install app / Add to Home screen</strong>.</li><li>Otvori Najavi sa nove ikonice.</li></ol></div>`}
     <div class="install-onboarding-actions">${!ios?`<button class="btn-primary" data-action="install-app" ${deferredInstallPrompt?'':'disabled'}>Instaliraj aplikaciju</button>`:''}<button class="btn-secondary" data-action="dismiss-install-onboarding">Kasnije</button></div>
   </div></div>`;
@@ -2181,9 +2184,12 @@ function bind(){
       const res=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:state.authMode,email,password})});
       const data=await res.json();
       if(!res.ok)throw new Error(data.error||'Prijava nije uspela.');
+      const justRegistered=state.authMode==='register';
       state.user=data.user; state.authChecked=true;
+      if(justRegistered){state.addresses=[];save('najava_addresses',state.addresses)}
+      state.installOnboardingNewAccount=justRegistered;
       state.installOnboarding=isMobileDevice() && !isStandalone();
-      await loadUserData(); await loadOutages(); await checkPushStatus(); syncExistingPushSubscription(); startAutoRefresh(); trackAnalytics('app_open','login'); if(isStandalone())trackAnalytics('install','standalone'); render();
+      await loadUserData(); await loadOutages(); await checkPushStatus(); syncExistingPushSubscription(); startAutoRefresh(); trackAnalytics('app_open',justRegistered?'register':'login'); if(isStandalone())trackAnalytics('install','standalone'); render();
     }catch(err){state.authError=err.message||String(err);render()}
   };
 
@@ -2266,7 +2272,7 @@ function bind(){
   const testPushBtn=document.querySelector('[data-action="test-push"]'); if(testPushBtn)testPushBtn.onclick=testPush;
   const refreshHistory=document.querySelector('[data-action="refresh-history"]'); if(refreshHistory)refreshHistory.onclick=loadHistory;
   document.querySelectorAll('[data-action="install-app"]').forEach(el=>el.onclick=installApp);
-  document.querySelectorAll('[data-action="dismiss-install-onboarding"]').forEach(el=>el.onclick=()=>{state.installOnboarding=false;render()});
+  document.querySelectorAll('[data-action="dismiss-install-onboarding"]').forEach(el=>el.onclick=()=>{state.installOnboarding=false;state.installOnboardingNewAccount=false;render()});
   document.querySelectorAll('[data-action="show-install-guide"]').forEach(el=>el.onclick=()=>{state.installOnboarding=true;render()});
   const del=document.querySelector('[data-action="delete-address"]'); if(del) del.onclick=()=>{ state.addresses=state.addresses.filter(x=>x.id!==state.editId); save('najava_addresses',state.addresses); syncUserData(); state.modal=null; state.editId=null; toast('Adresa je obrisana.'); render(); };
   const form=document.getElementById('addressForm');
@@ -2282,7 +2288,7 @@ async function checkAuth(){
 async function logoutUser(){
   await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'logout'})}).catch(()=>{});
   stopAutoRefresh();
-  state.user=null;state.profileOpen=false;state.expandedEventId=null;render();
+  state.user=null;state.addresses=[];save('najava_addresses',state.addresses);state.profileOpen=false;state.expandedEventId=null;state.installOnboarding=false;state.installOnboardingNewAccount=false;render();
 }
 async function loadUserData(){
   if(!state.user)return;
@@ -2290,11 +2296,9 @@ async function loadUserData(){
     const res=await fetch('/api/user-data');
     if(!res.ok)return;
     const data=await res.json();
-    const remoteHas=Array.isArray(data.addresses)&&data.addresses.length;
-    if(remoteHas){
-      state.addresses=data.addresses.map(x=>({...x,heating:x.heating!==false}));state.prefs={...state.prefs,...(data.prefs||{})};
-      save('najava_addresses',state.addresses);save('najava_prefs',state.prefs);
-    }else if(state.addresses.length){await syncUserData()}
+    state.addresses=Array.isArray(data.addresses)?data.addresses.map(x=>({...x,heating:x.heating!==false})):[];
+    state.prefs={...state.prefs,...(data.prefs||{})};
+    save('najava_addresses',state.addresses);save('najava_prefs',state.prefs);
   }catch{}
 }
 async function syncUserData(){
@@ -2514,7 +2518,7 @@ function toast(msg){ const old=document.querySelector('.toast'); if(old) old.rem
 function escapeHtml(s=''){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
 function escapeAttr(s=''){return escapeHtml(s)}
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();deferredInstallPrompt=event;state.installPromptReady=true;if(state.authChecked)render()});
-window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;state.installPromptReady=false;state.installOnboarding=false;if(state.user){trackAnalytics('install','appinstalled');checkPushStatus().then(render)}else if(state.authChecked)render()});
+window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;state.installPromptReady=false;state.installOnboarding=false;state.installOnboardingNewAccount=false;if(state.user){trackAnalytics('install','appinstalled');checkPushStatus().then(render)}else if(state.authChecked)render()});
 document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState!=='visible'||!state.user)return;
   trackAnalytics('app_open','foreground');
@@ -2539,6 +2543,7 @@ async function init(){
   await registerSW();
   await checkAuth();
   if(state.user){
+    state.installOnboardingNewAccount=false;
     state.installOnboarding=isMobileDevice() && !isStandalone();
     await loadUserData();await checkPushStatus();syncExistingPushSubscription();await Promise.all([loadOutages(),loadHistory()]);
     startAutoRefresh();
