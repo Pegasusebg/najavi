@@ -1774,8 +1774,9 @@ function sidebar(){
 }
 function navBtn(tab,label,ico){return `<button class="nav-btn ${state.tab===tab?'active':''}" data-tab="${tab}">${icon(ico)}<span>${label}</span></button>`}
 function topbar(){
-  const e=state.sources.electricity,w=state.sources.water;
-  const label=state.loading?'Učitavanje':(e?.ok&&w?.ok?'Uživo':(e?.ok||w?.ok?'Delimično':'Izvori offline'));
+  const e=state.sources.electricity,w=state.sources.water,h=state.sources.heating;
+  const active=[e,w,h].filter(s=>s?.ok).length;
+  const label=state.loading?'Učitavanje':(active===3?'Uživo':(active>0?'Delimično':'Izvori offline'));
   const initial=(state.user?.email||'A').charAt(0).toUpperCase();
   return `<div class="topbar">
     <div class="mobile-brand"><div class="mobile-brand-mark">${icon('bolt')}</div><strong>Najavi</strong></div>
@@ -1927,7 +1928,7 @@ function mobileEventDetail(m){
   <a class="mobile-source-link" href="${ev.sourceUrl}" target="_blank" rel="noopener">Zvanični izvor ${icon('ext','icon xs')}</a>`
 }
 function mobileSafeCard(){
-  return `<div class="mobile-safe-card"><div class="mobile-safe-icon">${icon('check')}</div><div><strong>Nema najavljenih prekida</strong><span>Za tvoje adrese trenutno nema aktivnih najava.</span></div></div>`
+  return `<div class="mobile-safe-card"><div class="mobile-safe-icon">${icon('check')}</div><div><strong>Nema najavljenih prekida ni radova</strong><span>Za tvoje adrese trenutno nema aktivnih najava.</span></div></div>`
 }
 function mobileAddressStrip(a){
   return `<div class="mobile-address-strip">
@@ -1947,7 +1948,7 @@ function summaryAlert(m){
 function detailsCard(m){
   const ev=m.event, a=m.address;
   return `<div class="card card-pad">
-    <div class="card-head"><div><h3>Detalji najave</h3><p>Najbliži prekid</p></div></div>
+    <div class="card-head"><div><h3>Detalji najave</h3><p>${ev.kind==='planned_work'?'Planirani radovi Beogradskih elektrana':'Najbliži prekid'}</p></div></div>
     <div class="detail-shell">
       <div class="detail-header">
         <div class="detail-icon warn">${icon(ev.utility==='electricity'?'bolt':ev.utility==='water'?'water':'heating')}</div>
