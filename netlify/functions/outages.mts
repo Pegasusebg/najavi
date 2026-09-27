@@ -3,6 +3,7 @@ const EDS_SOURCE = "https://elektrodistribucija.rs/planirana-iskljucenja/planira
 const EDS_DAY_BASE = "https://elektrodistribucija.rs/planirana-iskljucenja-beograd";
 const WATER_LIST = "https://www.beograd.rs/lat/servisne-informacije/vodovod-i-kanalizacija";
 const HEATING_LIST = "https://www.beograd.rs/lat/servisne-informacije/grejanje";
+const HEATING_PLANNED = "https://beoelektrane.co.rs/planirani-radovi/radovi-na-toplovodnoj-mrezi/";
 
 const MUNICIPALITIES = [
   "Barajevo","Čukarica","Grocka","Lazarevac","Mladenovac","Novi Beograd","Obrenovac",
@@ -28,6 +29,8 @@ type OutageEvent = {
   source: string;
   sourceUrl: string;
   note: string;
+  kind?: "outage" | "planned_work";
+  publishedAt?: string | null;
 };
 
 function decodeHtml(input = "") {
@@ -368,6 +371,116 @@ async function loadHeating() {
   return {events:events.filter(e=>withinWindow(e.date)), ok:true, errors, articlesChecked:links.length};
 }
 
+
+function plannedWorksPublishedDate(html: string) {
+  const datetime = html.match(/<time\b[^>]*datetime=["'](\d{4}-\d{2}-\d{2})/i)?.[1];
+  if (datetime) return datetime;
+  const text = cleanText(html);
+  const latin = extractSerbianDate(text);
+  if (latin) return latin;
+  const months: Record<string,number> = {
+    jan:1,feb:2,mar:3,apr:4,maj:5,jun:6,jul:7,avg:8,sep:9,okt:10,nov:11,dec:12,
+    "јан":1,"феб":2,"мар":3,"апр":4,"мај":5,"јун":6,"јул":7,"авг":8,"сеп":9,"окт":10,"нов":11,"дец":12
+  };
+  const m=text.match(/(\d{1,2})\s+([a-zа-я]{3})\s+(\d{4})/i);
+  return m&&months[m[2].toLowerCase()]?isoDate(Number(m[3]),months[m[2].toLowerCase()],Number(m[1])):null;
+}
+
+function canonicalHeatingStreet(raw: string) {
+  return raw
+    .trim()
+    .replace(/[.;]+$/,"")
+    .replace(/^u\s+/i,"")
+    .replace(/^(?:Ulici|ulici|Ulica|ulica|ulicama)\s+/i,"")
+    .replace(/^Bulevaru\s+/i,"Bulevar ")
+    .replace(/^Trgu\s+/i,"Trg ")
+    .replace(/\s+[–—-]\s+Stari\s+Merkator.*$/i,"")
+    .trim();
+}
+
+function plannedWorkTargets(line: string) {
+  const clean=normalizeLine(line);
+  const out:{street:string;numberSpec:string;scope:"numbers"|"partial";note:string}[]=[];
+  if(!/radov|popravk|izgradnj|remont/i.test(clean))return out;
+
+  const corner=clean.match(/na\s+uglu\s+ulica\s+(.+?)\s+i\s+(.+?)(?:\s*\(|[.;]|$)/i);
+  if(corner){
+    for(const raw of [corner[1],corner[2]]){
+      const street=canonicalHeatingStreet(raw);
+      if(street)out.push({street,numberSpec:"",scope:"partial",note:clean});
+    }
+    return out;
+  }
+
+  let phrase=clean.match(/(?:\bu\s+|\boko\s+)(.+)$/i)?.[1]||"";
+  if(!phrase)return out;
+  phrase=phrase.replace(/\s*\([^)]*\)\s*$/,"").trim();
+
+  const split=phrase.split(/\s+i\s+(?=(?:Ulici|ulici|Ulica|ulica)\b)/i);
+  for(let raw of split){
+    raw=canonicalHeatingStreet(raw);
+    if(!raw)continue;
+
+    let numberSpec="";
+    const kod=raw.match(/\s+kod\s+broja\s+(\d+[A-Za-zА-Яа-я]?)/i);
+    if(kod){
+      numberSpec=kod[1];
+      raw=raw.slice(0,kod.index).trim();
+    }else{
+      const range=raw.match(/\s+(\d+[A-Za-zА-Яа-я]?)(?:\s*[–—-]\s*(\d+[A-Za-zА-Яа-я]?))$/u);
+      if(range){
+        numberSpec=range[2]?range[1]+"-"+range[2]:range[1];
+        raw=raw.slice(0,range.index).trim();
+      }
+    }
+
+    const street=canonicalHeatingStreet(raw);
+    if(street)out.push({street,numberSpec,scope:numberSpec?"numbers":"partial",note:clean});
+  }
+  return out;
+}
+
+function parseHeatingPlannedWorks(html: string, sourceUrl: string): OutageEvent[] {
+  const published=plannedWorksPublishedDate(html);
+  if(!published || published<localIsoDay(-14))return [];
+  const lines=cleanText(html).split("\n").map(normalizeLine).filter(Boolean);
+  let municipality="";
+  const out:OutageEvent[]=[];
+  for(const line of lines){
+    if(/Radovi\s+na\s+toplovodnoj\s+mreži/i.test(line)){
+      const found=MUNICIPALITIES.find(m=>line.toLocaleLowerCase("sr").includes(m.toLocaleLowerCase("sr")));
+      if(found){municipality=found;continue;}
+    }
+    if(!municipality)continue;
+    for(const target of plannedWorkTargets(line)){
+      out.push({
+        id:"heating-plan-"+stableId([published,municipality,target.street,target.numberSpec,target.note]),
+        utility:"heating",
+        kind:"planned_work",
+        publishedAt:published,
+        date:published,
+        endDate:localIsoDay(7),
+        start:"00:00",
+        end:"23:59",
+        municipality,
+        street:target.street,
+        numberSpec:target.numberSpec,
+        scope:target.scope,
+        source:"Beogradske elektrane — Planirani radovi",
+        sourceUrl,
+        note:target.note
+      });
+    }
+  }
+  return out;
+}
+
+async function loadHeatingPlannedWorks() {
+  const html=await fetchText(HEATING_PLANNED);
+  const events=parseHeatingPlannedWorks(html,HEATING_PLANNED);
+  return {events,ok:true,errors:[],publishedAt:plannedWorksPublishedDate(html)};
+}
+
 function localIsoDay(offsetDays = 0) {
   const d = new Date(Date.now() + offsetDays*86400000);
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -410,13 +523,14 @@ async function loadWater() {
 
 export default async (_req: Request) => {
   const checkedAt = new Date().toISOString();
-  const [electricity, water, heating] = await Promise.allSettled([loadElectricity(),loadWater(),loadHeating()]);
+  const [electricity, water, heating, heatingPlanned] = await Promise.allSettled([loadElectricity(),loadWater(),loadHeating(),loadHeatingPlannedWorks()]);
 
   const e = electricity.status === "fulfilled" ? electricity.value : {events:[],ok:false,errors:[String(electricity.reason)]};
   const w = water.status === "fulfilled" ? water.value : {events:[],ok:false,errors:[String(water.reason)],articlesChecked:0};
   const h = heating.status === "fulfilled" ? heating.value : {events:[],ok:false,errors:[String(heating.reason)],articlesChecked:0};
+  const hp = heatingPlanned.status === "fulfilled" ? heatingPlanned.value : {events:[],ok:false,errors:[String(heatingPlanned.reason)],publishedAt:null};
 
-  const events = [...e.events,...w.events,...h.events]
+  const events = [...e.events,...w.events,...h.events,...hp.events]
     .sort((a,b)=>(a.date+a.start+a.municipality+a.street).localeCompare(b.date+b.start+b.municipality+b.street));
 
   return new Response(JSON.stringify({
@@ -439,12 +553,15 @@ export default async (_req: Request) => {
         error:w.errors.length ? w.errors.join(" | ").slice(0,600) : null
       },
       heating:{
-        ok:h.ok,
+        ok:h.ok || hp.ok,
         source:"Beogradske elektrane / Grad Beograd",
-        sourceUrl:HEATING_LIST,
-        count:h.events.length,
+        sourceUrl:HEATING_PLANNED,
+        count:h.events.length + hp.events.length,
+        interruptionCount:h.events.length,
+        plannedWorkCount:hp.events.length,
+        plannedWorksPublishedAt:hp.publishedAt,
         articlesChecked:h.articlesChecked,
-        error:h.errors.length ? h.errors.join(" | ").slice(0,600) : null
+        error:[...h.errors,...hp.errors].length ? [...h.errors,...hp.errors].join(" | ").slice(0,600) : null
       }
     }
   }),{
